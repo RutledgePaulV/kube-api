@@ -23,16 +23,13 @@
      (-> (get response :body)
          (with-meta {:request request :response response})))))
 
-(defn get-swagger-specification [client]
-  (request* client "/openapi/v2" :get))
-
 (defn create-client
   ([]
    (create-client (auth/get-context)))
   ([context]
    (if (map? context)
      (with-meta context
-       {:swagger (delay (get-swagger-specification context))})
+       {:swagger (delay (request* context "/openapi/v2" :get))})
      (recur (create-client (auth/select-context context))))))
 
 
