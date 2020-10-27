@@ -12,6 +12,8 @@ Seeks to improve:
 - Support authentication using ~/.kube/config and service account token files so users don't have to glue that together
   themselves.
 
+- Support automatic certificate validation of the kube-api server so users don't have to fuss with ssl contexts.
+  
 - Support watches.
 
 - Produce more readable endpoint specifications.
