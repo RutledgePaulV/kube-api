@@ -30,7 +30,7 @@
    (if (map? context)
      (with-meta context
        {:swagger (delay (request* context "/openapi/v2" :get))})
-     (recur (create-client (auth/select-context context))))))
+     (recur (auth/select-context context)))))
 
 
 (defn ops [client]
