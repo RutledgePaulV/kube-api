@@ -52,7 +52,7 @@
 (defn random-password ^"[C" [length]
   (let [bites (.nextBytes random-gen (byte-array (* 2 length)))
         chars (char-array length)]
-    (dotimes [[i [a b]] (map-indexed vector (partition-all 2 bites))]
+    (doseq [[i [a b]] (map-indexed vector (partition-all 2 bites))]
       (let [c (char (bit-or (bit-shift-left a 8) b))]
         (aset chars i c)))
     chars))
