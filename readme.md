@@ -17,3 +17,5 @@ Seeks to improve:
 - Support watches.
 
 - Produce more readable endpoint specifications.
+
+- Don't use http-kit (poor streaming behavior) and large deps like martian.

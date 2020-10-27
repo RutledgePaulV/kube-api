@@ -21,13 +21,15 @@
   (->> (kubeconfig-files)
        (map slurp)
        (map yaml/parse-string)
-       (apply utils/meta-merge)))
+       (apply utils/merge+)))
 
 (defn service-account []
   (let [namespace (io/file "/run/secrets/kubernetes.io/serviceaccount/namespace")
         ca-cert   (io/file "/run/secrets/kubernetes.io/serviceaccount/ca.crt")
         token     (io/file "/run/secrets/kubernetes.io/serviceaccount/token")]
-    (when (and (readable? namespace) (readable? ca-cert) (readable? token))
+    (when (and (readable? namespace) (readable? ca-cert) (readable? token)
+               (not (strings/blank? (System/getenv "KUBERNETES_SERVICE_HOST")))
+               (not (strings/blank? (System/getenv "KUBERNETES_SERVICE_PORT_HTTPS"))))
       (let [token      (slurp token)
             namespace  (slurp namespace)
             ca-cert    (slurp ca-cert)
@@ -35,7 +37,7 @@
             port       (System/getenv "KUBERNETES_SERVICE_PORT_HTTPS")
             endpoint   (cond-> (str "https://" host)
                          (not= port "443") (str ":" port))
-            clean-cert (utils/clean-cert ca-cert)]
+            clean-cert (utils/pem-body ca-cert)]
         {:user      {:token token}
          :cluster   {:certificate-authority-data clean-cert
                      :server                     endpoint}
