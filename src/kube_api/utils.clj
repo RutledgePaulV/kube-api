@@ -41,15 +41,15 @@
 
 
 (defn pem-body [s]
-  (-> s
-      (strings/replace #".*BEGIN.*" "")
-      (strings/replace #".*END.*" "")
-      (strings/trim)
-      (strings/split-lines)
-      (apply str)))
+  (strings/join ""
+    (-> s
+        (strings/replace #".*BEGIN.*" "")
+        (strings/replace #".*END.*" "")
+        (strings/trim)
+        (strings/split-lines))))
 
 
-(defn ^chars random-password [length]
+(defn random-password ^"[C" [length]
   (let [bites (.nextBytes random-gen (byte-array (* 2 length)))
         chars (char-array length)]
     (dotimes [[i [a b]] (map-indexed vector (partition-all 2 bites))]
@@ -58,7 +58,7 @@
     chars))
 
 
-(defn defmemo [& defnargs]
+(defmacro defmemo [& defnargs]
   `(doto (defn ~@defnargs)
      (alter-var-root #(with-meta (memoize %) (meta %)))))
 

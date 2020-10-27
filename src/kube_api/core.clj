@@ -15,12 +15,17 @@
          ca-cert     (get-in client [:cluster :certificate-authority-data])
          client-cert (get-in client [:cluster :client-certificate-data])
          client-key  (get-in client [:cluster :client-key-data])
+         username    (get-in client [:user :username])
+         password    (get-in client [:user :password])
          request     (utils/merge+
-                       (cond-> {:headers        {"Authorization" (str "Bearer " token)}
-                                :url            (utils/mk-url server uri)
+                       (cond-> {:url            (utils/mk-url server uri)
                                 :as             :json-strict
                                 :content-type   "application/json"
                                 :request-method (keyword method)}
+                         (not (strings/blank? token))
+                         (assoc-in [:headers "Authorization"] (str "Bearer " token))
+                         (and (not (strings/blank? username)) (not (strings/blank? password)))
+                         (assoc :basic-auth [username password])
                          (not (strings/blank? ca-cert))
                          (assoc :trust-managers (ssl/trust-managers ca-cert))
                          (and (not (strings/blank? client-cert)) (not (strings/blank? client-key)))
