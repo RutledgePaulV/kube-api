@@ -4,8 +4,10 @@
             [kube-api.auth :as auth]
             [kube-api.ssl :as ssl]
             [clojure.string :as strings]
-            [kube-api.spec :as spec]))
-
+            [kube-api.spec :as spec]
+            [kube-api.swagger :as swag]
+            [malli.error :as me]
+            [malli.core :as m]))
 
 (defn request*
   ([client url method]
@@ -43,17 +45,46 @@
   ([context]
    (if (map? context)
      (with-meta context
-       {:swagger (delay (request* context "/openapi/v2" :get))})
+       {:data
+        (delay (let [swagger-spec (request* context "/openapi/v2" :get)
+                     operations   (swag/swagger->ops swagger-spec)]
+                 {:swagger swagger-spec :operations operations}))})
      (recur (auth/select-context context)))))
 
-(defn spec [client]
-  (force (:swagger (meta client))))
+(defn swagger-specification
+  "Returns the raw swagger specification."
+  [client]
+  (-> client (meta) :data (force) :swagger))
+
+(defn operation-specification
+  "Returns the full operation representation used by this library."
+  [client]
+  (-> client (meta) :data (force) :operations))
 
 (defn ops [client]
-  )
+  (keys (operation-specification client)))
 
 (defn docs [client op]
-  )
+  (get (operation-specification client) (name op)))
 
-(defn invoke [client]
-  )
+(def ^:private validator-factory
+  (memoize (fn [schema] (m/validator schema))))
+
+(defn invoke [client op request]
+  (let [definition     (get (operation-specification client) (name op))
+        request-schema (get definition :request)
+        validator      (validator-factory request-schema)]
+    (if-not (validator request)
+      (-> (m/explain request-schema request)
+          (me/with-spell-checking)
+          (me/humanize))
+      (let [endpoint     (str "/" (:endpoint definition))
+            method       (:verb definition)
+            rendered-uri (utils/render-template-string endpoint (get-in request [:path-params]))]
+        (request*
+          client rendered-uri method
+          (cond-> {}
+            (not-empty (:query-params request))
+            (assoc :query-params (:query-params request))
+            (not-empty (:body-params request))
+            (assoc :form-params (:form-params request))))))))

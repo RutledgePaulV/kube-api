@@ -20,12 +20,18 @@
 
 (defmulti json-schema->malli #'dispatch)
 
+(defmethod json-schema->malli :default [node context]
+  (throw (ex-info "Undefined conversion!" {:node node})))
+
 (defmethod json-schema->malli "$ref" [node context]
-  (let [pointer    (get node :$ref)
-        path       (pointer->path pointer)
-        definition (get-in context path)
-        expanded   (json-schema->malli definition context)]
-    expanded))
+  (try
+    (let [pointer    (get node :$ref)
+          path       (pointer->path pointer)
+          definition (get-in context path)
+          expanded   (json-schema->malli definition context)]
+      expanded)
+    (catch StackOverflowError e
+      (throw (ex-info "Non terminating!" {:node node})))))
 
 (defmethod json-schema->malli "array" [node context]
   [:vector (json-schema->malli (:items node) context)])
@@ -75,39 +81,9 @@
   (-> (get-definition swagger-spec definition)
       (json-schema->malli swagger-spec)))
 
-
-
-(defn compile-params [specification params]
-  )
-
-(defn normalized [swagger-spec]
-  (for [[endpoint methods] (:paths swagger-spec)
-        :let [shared-params (group-by :in (:parameters methods {}))]
-        [verb method] (select-keys methods [:put :post :delete :get :options :head :patch :watch])
-        :let [method-params (group-by :in (:parameters methods {}))]
-        :when (contains? method :operationId)]
-    (letfn [(params [kind]
-              (->> (distinct
-                     (into (get shared-params kind [])
-                           (get method-params kind [])))
-                   (map #(dissoc % :description))))]
-      {:endpoint     (name endpoint)
-       :verb         verb
-       :operation    (get method :operationId)
-       :tags         (get method :tags [])
-       :kind         (get method :x-kubernetes-group-version-kind)
-       :path-params  (params "path")
-       :body-params  (params "body")
-       :query-params (params "query")})))
-
-
-(comment
-
-  (defn exercise [specification]
-    (doseq [entrypoint (sort (keys (:definitions specification)))]
-      (try
-        (->malli specification entrypoint)
-        (catch Exception e
-          (println entrypoint)))))
-
-  )
+(defn exercise [specification]
+  (doseq [entrypoint (sort (keys (:definitions specification)))]
+    (try
+      (->malli specification entrypoint)
+      (catch Exception e
+        (println entrypoint)))))

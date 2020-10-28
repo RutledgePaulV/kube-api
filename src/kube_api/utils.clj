@@ -74,3 +74,15 @@
 
 (defn pem-stream [s]
   (base64-string->stream (pem-body s)))
+
+
+(defn render-template-string [s ctx]
+  (strings/replace s #"\{([^\{\}]+)\}"
+    (fn [[_ variable]]
+      (if-some [[_ v] (find ctx (keyword variable))]
+        (str v)
+        (throw (ex-info "Missing template variable." {:variable variable :context ctx}))))))
+
+
+(defn rand-submap [m]
+  (select-keys m (random-sample 0.05 (keys m))))
