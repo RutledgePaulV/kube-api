@@ -3,7 +3,8 @@
             [kube-api.utils :as utils]
             [kube-api.auth :as auth]
             [kube-api.ssl :as ssl]
-            [clojure.string :as strings]))
+            [clojure.string :as strings]
+            [kube-api.spec :as spec]))
 
 
 (defn request*
@@ -45,6 +46,8 @@
        {:swagger (delay (request* context "/openapi/v2" :get))})
      (recur (auth/select-context context)))))
 
+(defn spec [client]
+  (force (:swagger (meta client))))
 
 (defn ops [client]
   )

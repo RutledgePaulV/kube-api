@@ -43,8 +43,8 @@
 (defn pem-body [s]
   (strings/join ""
     (-> s
-        (strings/replace #".*BEGIN.*" "")
-        (strings/replace #".*END.*" "")
+        (strings/replace #".*BEGIN\s+.*" "")
+        (strings/replace #".*END\s+.*" "")
         (strings/trim)
         (strings/split-lines))))
 
@@ -63,12 +63,13 @@
      (alter-var-root #(with-meta (memoize %) (meta %)))))
 
 
-(defn base64-string->bytes [^String s]
+(defn base64-string->bytes ^"[B" [^String s]
   (.decode (Base64/getDecoder) s))
 
 
 (defn base64-string->stream [^String contents]
-  (ByteArrayInputStream. (base64-string->bytes contents)))
+  (ByteArrayInputStream.
+    (base64-string->bytes contents)))
 
 
 (defn pem-stream [s]
