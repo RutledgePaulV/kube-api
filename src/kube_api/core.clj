@@ -4,7 +4,6 @@
             [kube-api.auth :as auth]
             [kube-api.ssl :as ssl]
             [clojure.string :as strings]
-            [kube-api.spec :as spec]
             [kube-api.swagger :as swag]
             [malli.error :as me]
             [malli.core :as m]))
@@ -21,10 +20,12 @@
          username    (get-in client [:user :username])
          password    (get-in client [:user :password])
          request     (utils/merge+
-                       (cond-> {:url            (utils/mk-url server uri)
-                                :as             :json-strict
-                                :content-type   "application/json"
-                                :request-method (keyword method)}
+                       (cond-> {:url                (utils/mk-url server uri)
+                                :as                 :json-strict
+                                :content-type       "application/json"
+                                :request-method     (keyword method)
+                                :socket-timeout     1000
+                                :connection-timeout 1000}
                          (not (strings/blank? token))
                          (assoc-in [:headers "Authorization"] (str "Bearer " token))
                          (and (not (strings/blank? username)) (not (strings/blank? password)))
@@ -45,21 +46,20 @@
   ([context]
    (if (map? context)
      (with-meta context
-       {:data
-        (delay (let [swagger-spec (request* context "/openapi/v2" :get)
-                     operations   (swag/swagger->ops swagger-spec)]
-                 {:swagger swagger-spec :operations operations}))})
+       (let [swagger    (delay (request* context "/openapi/v2" :get))
+             operations (delay (swag/swagger->ops (deref swagger)))]
+         {:swagger swagger :operations operations}))
      (recur (auth/select-context context)))))
 
 (defn swagger-specification
   "Returns the raw swagger specification."
   [client]
-  (-> client (meta) :data (force) :swagger))
+  (-> client (meta) :swagger (force)))
 
 (defn operation-specification
   "Returns the full operation representation used by this library."
   [client]
-  (-> client (meta) :data (force) :operations))
+  (-> client (meta) :operations (force)))
 
 (defn ops [client]
   (keys (operation-specification client)))

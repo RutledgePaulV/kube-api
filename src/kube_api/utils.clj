@@ -77,12 +77,40 @@
 
 
 (defn render-template-string [s ctx]
-  (strings/replace s #"\{([^\{\}]+)\}"
-    (fn [[_ variable]]
-      (if-some [[_ v] (find ctx (keyword variable))]
-        (str v)
-        (throw (ex-info "Missing template variable." {:variable variable :context ctx}))))))
+  (letfn [(replace [[_ variable]]
+            (if-some [[_ v] (find ctx (keyword variable))]
+              (str v)
+              (throw (ex-info "Missing template variable." {:variable variable :context ctx}))))]
+    (strings/replace s #"\{([^\{\}]+)\}" replace)))
 
+
+(defn pointer->path [pointer]
+  (->> (strings/split pointer #"/")
+       (remove #{"#"})
+       (map keyword)
+       (into [])))
+
+(defn branch? [form]
+  (or (and (not (string? form)) (seqable? form))
+      (and (delay? form) (realized? form))))
+
+(defn children [form]
+  (if (delay? form) (list (force form)) (seq form)))
+
+(defn walk-seq [form]
+  (tree-seq branch? children form))
+
+(defn seek
+  ([pred coll]
+   (seek pred coll nil))
+  ([pred coll not-found]
+   (reduce (fn [nf x] (if (pred x) (reduced x) nf)) not-found coll)))
+
+(defn dfs
+  ([pred form]
+   (seek pred (walk-seq form)))
+  ([pred form not-found]
+   (seek pred (walk-seq form) not-found)))
 
 (defn rand-submap [m]
   (select-keys m (random-sample 0.05 (keys m))))

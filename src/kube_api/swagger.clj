@@ -12,9 +12,9 @@
                (assoc :description (:description param)))
              (cond
                (contains? param :schema)
-               (spec/json-schema->malli (get param :schema) specification)
+               (spec/swagger->malli specification (get param :schema))
                (contains? param :type)
-               (spec/json-schema->malli (select-keys param [:type]) specification)
+               (spec/swagger->malli specification (select-keys param [:type]))
                :otherwise
                (throw (ex-info "IDK" {:param param})))])]
     (let [grouped (group-by :in params)
