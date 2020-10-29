@@ -1,5 +1,6 @@
 (ns kube-api.utils
-  (:require [clojure.string :as strings])
+  (:require [clojure.string :as strings]
+            [malli.core :as m])
   (:import [java.security SecureRandom]
            [java.util Base64]
            [java.io ByteArrayInputStream]))
@@ -11,6 +12,9 @@
 (defn index-by [f coll]
   (into {} (map (juxt f identity)) coll))
 
+
+(def validator-factory
+  (memoize (fn [schema] (m/validator schema))))
 
 (defn merge+
   ([] {})
@@ -111,6 +115,21 @@
    (seek pred (walk-seq form)))
   ([pred form not-found]
    (seek pred (walk-seq form) not-found)))
+
+(defn map-vals
+  [f m]
+  (letfn [(f* [agg k v] (assoc! agg k (f v)))]
+    (with-meta
+      (persistent! (reduce-kv f* (transient (or (empty m) {})) m))
+      (meta m))))
+
+(defn groupcat-by [f coll]
+  (->> coll
+       (mapcat #(map vector (f %) (repeat %)))
+       (reduce (fn [m [k v]] (update m k (fnil conj []) v)) {})))
+
+(defmacro defmethodset [symbol dispatch-keys & body]
+  `(doseq [dispatch# ~dispatch-keys] (defmethod ~symbol dispatch# ~@body)))
 
 (defn rand-submap [m]
   (select-keys m (random-sample 0.05 (keys m))))

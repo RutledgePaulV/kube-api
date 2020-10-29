@@ -1,4 +1,7 @@
-(ns kube-api.spec
+(ns kube-api.swagger.malli
+  "Conversion from swagger's json-schema into malli schemas.
+   Supports recursive definitions in the swagger schema by mapping
+   to local malli registries."
   (:require [kube-api.utils :as utils]))
 
 (def Base64Pattern #"^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$")
@@ -6,6 +9,14 @@
 
 (defn dispatch [node context registry]
   (cond
+
+    ; this is a hack extension point in the
+    ; AST so we can define custom malli
+    ; schemas for a handful of swagger defs
+    ; that are insufficiently specified (mainly
+    ; around places where the k8s spec uses
+    ; json-schema to define json-schema.. yay
+    ; for meta schemas)
     (keyword? node)
     node
 
@@ -13,17 +24,31 @@
     "$ref"
 
     (contains? node :type)
-    (get node :type)))
+    (get node :type)
+
+    ; some swagger defs are missing type decls
+    ; so we have to discover them using the
+    ; shape i guess... RAWR
+    (and (map? node) (contains? node :properties))
+    "object"))
 
 (defmulti
   swagger->malli*
   "A multimethod for converting from a swagger specification into
    a malli schema. Implementations should return a tuple of the new
-   malli registry and the malli schema for the requested swagger node."
+   malli registry and the malli schema for the requested swagger node.
+
+   Note that this is probably insufficient for general use as I've only
+   written it to conform to the subset of json-schema / swagger that I
+   see being returned by kubernetes api server implementations. Perhaps one
+   day I will write a comprehensive version of this transform for json schema
+   but I worry json schema is not followed rigorously enough in the real world
+   to not require tailoring...
+   "
   #'dispatch)
 
 (defmethod swagger->malli* :default [node context registry]
-  (throw (ex-info "Undefined conversion!" {:node node})))
+  (throw (ex-info "Undefined conversion! Teach me." {:node node})))
 
 (defmethod swagger->malli* "$ref" [node context registry]
   (let [pointer    (get node :$ref)
@@ -64,16 +89,16 @@
       (cond
         (and (empty? props) closed)
         [registry
-         [:map-of (cond-> {} description (assoc :description description))
-          :string
-          'any?]]
+         (if description
+           [:map-of {:description description} :string 'any?]
+           [:map-of :string 'any?])]
         (and (empty? props) (not closed))
         (let [[child-registry child]
               (swagger->malli* (:additionalProperties node) context registry)]
           [child-registry
-           [:map-of (cond-> {} description (assoc :description description))
-            :string
-            child]])
+           (if description
+             [:map-of {:description description} :string child]
+             [:map-of :string child])])
         (not-empty props)
         (let [children (map (fn [[k v]]
                               (let [[child-registry child] (swagger->malli* v context registry)
@@ -108,45 +133,9 @@
 (defmethod swagger->malli* "boolean" [node context registry]
   [registry :boolean])
 
-
-
 (defn swagger->malli
   "How you exchange a swagger specification for a malli schema. Must specify
    the 'root' chunk of swagger spec that you want to convert into a schema."
   [swagger-spec root]
   (let [[registry schema] (swagger->malli* root swagger-spec {})]
     (if (empty? registry) schema [:schema {:registry registry} schema])))
-
-
-
-; kubernetes specific extensions because some of their swagger specs are insufficiently described
-
-(defmethod swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON [_ context registry]
-  [registry [:or :bool :int :double :string [:vector]]])
-
-(defmethod swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool [_ context registry]
-  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
-        [child-registry child] (swagger->malli* json-schema-props context registry)]
-    [child-registry [:or {:default true} :boolean child]]))
-
-(defmethod swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray [_ context registry]
-  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
-        [child-registry child] (swagger->malli* json-schema-props context registry)]
-    [child-registry [:or [:vector child] child]]))
-
-(defmethod swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray [_ context registry]
-  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
-        [child-registry child] (swagger->malli* json-schema-props context registry)]
-    [child-registry [:or [:vector :string] child]]))
-
-(defmethod swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON [_ context registry]
-  (swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON context registry))
-
-(defmethod swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool [_ context registry]
-  (swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool context registry))
-
-(defmethod swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrArray [_ context registry]
-  (swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray context registry))
-
-(defmethod swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray [_ context registry]
-  (swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray context registry))

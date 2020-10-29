@@ -4,7 +4,8 @@
             [kube-api.auth :as auth]
             [kube-api.ssl :as ssl]
             [clojure.string :as strings]
-            [kube-api.swagger :as swag]
+            [kube-api.swagger.kubernetes :as swag]
+            [malli.generator :as gen]
             [malli.error :as me]
             [malli.core :as m]))
 
@@ -47,7 +48,7 @@
    (if (map? context)
      (with-meta context
        (let [swagger    (delay (request* context "/openapi/v2" :get))
-             operations (delay (swag/swagger->ops (deref swagger)))]
+             operations (delay (swag/kube-swagger->operation-views (deref swagger)))]
          {:swagger swagger :operations operations}))
      (recur (auth/select-context context)))))
 
@@ -67,13 +68,27 @@
 (defn docs [client op]
   (get (operation-specification client) (name op)))
 
-(def ^:private validator-factory
-  (memoize (fn [schema] (m/validator schema))))
+(defn validate-request [client op request]
+  (let [definition     (get (operation-specification client) (name op))
+        request-schema (get definition :request)
+        validator      (utils/validator-factory request-schema)]
+    (or (validator request)
+        (-> (m/explain request-schema request)
+            (me/with-spell-checking)
+            (me/humanize)))))
+
+(defn example-request [client op]
+  (when-some [{:keys [request]} (get (operation-specification client) (name op))]
+    (gen/generate request)))
+
+(defn example-response [client op]
+  (when-some [{:keys [response]} (get (operation-specification client) (name op))]
+    (gen/generate (val (first (into (sorted-map) response))))))
 
 (defn invoke [client op request]
   (let [definition     (get (operation-specification client) (name op))
-        request-schema (get definition :request)
-        validator      (validator-factory request-schema)]
+        request-schema (get definition :request-schema)
+        validator      (utils/validator-factory request-schema)]
     (if-not (validator request)
       (-> (m/explain request-schema request)
           (me/with-spell-checking)
