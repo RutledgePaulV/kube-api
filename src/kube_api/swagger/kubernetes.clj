@@ -3,7 +3,9 @@
   (:require [kube-api.swagger.swagger :as swagger]
             [kube-api.swagger.malli :as malli]
             [kube-api.utils :as utils]
-            [clojure.set :as sets]))
+            [clojure.set :as sets]
+            [clojure.java.io :as io]
+            [clojure.edn :as edn]))
 
 
 ; kubernetes specific extensions because these swagger specs are insufficiently
@@ -14,7 +16,9 @@
   #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON
     :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON}
   [_ context registry]
-  [registry [:or :bool :int :double :string [:vector]]])
+  (let [definition [:or :bool :int :double :string [:vector [:ref ::json]] [:map-of :string [:ref ::json]]]]
+    [(merge registry {:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON definition})
+     [:ref :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON]]))
 
 (utils/defmethodset malli/swagger->malli*
   #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool
@@ -22,7 +26,7 @@
   [_ context registry]
   (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
         [child-registry child] (malli/swagger->malli* json-schema-props context registry)]
-    [child-registry [:or {:default true} :boolean child]]))
+    [child-registry [:or {:default true} child :boolean]]))
 
 (utils/defmethodset malli/swagger->malli*
   #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray
@@ -30,7 +34,7 @@
   [_ context registry]
   (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
         [child-registry child] (malli/swagger->malli* json-schema-props context registry)]
-    [child-registry [:or [:vector child] child]]))
+    [child-registry [:or child [:vector child]]]))
 
 (utils/defmethodset malli/swagger->malli*
   #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray
@@ -38,10 +42,13 @@
   [_ context registry]
   (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
         [child-registry child] (malli/swagger->malli* json-schema-props context registry)]
-    [child-registry [:or [:vector :string] child]]))
+    [child-registry [:or child [:vector :string]]]))
 
 (defn kubernetes-group-version-kind [op]
   (get-in op [:custom-attributes :x-kubernetes-group-version-kind]))
+
+(defn normalize-action [action]
+  (or ({"post" "create" "watchlist" "watch" "put" "update"} action) action))
 
 (defn kubernetes-action [op]
   (get-in op [:custom-attributes :x-kubernetes-action]))
@@ -58,6 +65,9 @@
 (defn well-formed? [op]
   (and (not-empty (kubernetes-group-version-kind op))
        (not-empty (kubernetes-action op))))
+
+(defn normalize [op]
+  (update-in op [:custom-attributes :x-kubernetes-action] normalize-action))
 
 (defn most-appropriate-default-version [options]
   (letfn [(version->preference-rank [version]
@@ -79,24 +89,45 @@
 (defn most-appropriate-group [options]
   (if (contains? (set options) "") "" (first (sort options))))
 
+(def modifications
+  (delay (edn/read-string (slurp (io/resource "kube_api/swagger-overlay.edn")))))
+
+
+(defn op-selector-schema [{:keys [by-group by-version by-kind by-action] :as views}]
+  [:map {:closed true}
+   [:group {:optional true} (into [:enum] (sort (keys by-group)))]
+   [:version {:optional true} (into [:enum] (sort (keys by-version)))]
+   [:kind (into [:enum] (sort (keys by-kind)))]
+   [:action (into [:enum] (sort (keys by-action)))]])
+
 (defn kube-swagger->operation-views
   "Converts the swagger-spec into a set of operations and creates a few lookup
    tables by those attributes that people interacting with kubernetes most
    commonly use to specify an operation."
   [swagger-spec]
-  (let [operations (filter well-formed? (swagger/swagger->ops swagger-spec))]
-    {:operations (utils/index-by
-                   (fn [op]
-                     (array-map
-                       :kind (kubernetes-kind op)
-                       :action (kubernetes-action op)
-                       :version (kubernetes-version op)
-                       :group (kubernetes-group op)))
-                   operations)
-     :by-group   (group-by kubernetes-group operations)
-     :by-version (group-by kubernetes-version operations)
-     :by-kind    (group-by kubernetes-kind operations)
-     :by-action  (group-by kubernetes-action operations)}))
+  (let [modified-spec (utils/merge+ swagger-spec (force modifications))
+        operations    (->> (swagger/swagger->ops modified-spec)
+                           (filter well-formed?)
+                           (map normalize))
+        by-selector   (utils/index-by
+                        (fn [op]
+                          (array-map
+                            :kind (kubernetes-kind op)
+                            :action (kubernetes-action op)
+                            :version (kubernetes-version op)
+                            :group (kubernetes-group op)))
+                        operations)
+        by-group      (group-by kubernetes-group operations)
+        by-version    (group-by kubernetes-version operations)
+        by-kind       (group-by kubernetes-kind operations)
+        by-action     (group-by kubernetes-action operations)
+        views         {:operations by-selector
+                       :by-group   by-group
+                       :by-version by-version
+                       :by-kind    by-kind
+                       :by-action  by-action}
+        schema        (op-selector-schema views)]
+    (assoc views :op-selector-schema schema)))
 
 
 (defn get-op [{:keys [by-group by-version by-kind by-action] :as views}
@@ -122,21 +153,3 @@
                        (set (get r-by-version best-version #{}))
                        (set (get r-by-action best-action #{})))]
     (first remainder')))
-
-
-(comment
-  (defn invoke [client operation]
-    )
-
-  (def client {})
-
-  (invoke client
-          {:kind :Deployment}
-          )
-
-  (invoke client
-          {:apiVersion ""
-           :resource   :Deployment
-           })
-
-  )

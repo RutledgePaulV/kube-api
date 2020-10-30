@@ -68,12 +68,12 @@
         ; this is much faster, but it produces schemas with more registry
         ; indirection than is actually required since it represents an
         ; eager approach to registry registration
-        [(update child-reg identifier #(or % child)) [:ref identifier]]
+        #_[(update child-reg identifier #(or % child)) child]
 
         ; this is slow since it backtracks over the generated schema
         ; to see if it actually used the available recursive reference
         ; and if it did not then it removes the definition from the registry
-        #_(if (utils/dfs #(= [:ref identifier] %) child)
+        (if (utils/dfs #(= [:ref identifier] %) child)
           [(update child-reg identifier #(or % child)) [:ref identifier]]
           [(if (get child-reg identifier) child-reg (dissoc child-reg identifier)) child])))))
 

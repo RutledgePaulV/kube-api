@@ -1,13 +1,16 @@
 (ns kube-api.utils
   (:require [clojure.string :as strings]
-            [malli.core :as m])
+            [malli.core :as m]
+            [malli.error :as me])
   (:import [java.security SecureRandom]
-           [java.util Base64]
            [java.io ByteArrayInputStream]
-           [java.util.regex Pattern]))
+           [java.util.regex Pattern]
+           [java.util Base64]))
 
 
-(defonce random-gen (SecureRandom/getInstanceStrong))
+(defonce random-gen
+  (SecureRandom/getInstanceStrong))
+
 
 (defn map-vals
   [f m]
@@ -16,11 +19,14 @@
       (persistent! (reduce-kv f* (transient (or (empty m) {})) m))
       (meta m))))
 
+
 (defn index-by [f coll]
   (into {} (map (juxt f identity)) coll))
 
+
 (def validator-factory
   (memoize (fn [schema] (m/validator schema))))
+
 
 (defn merge+
   ([] {})
@@ -100,21 +106,26 @@
        (map keyword)
        (into [])))
 
+
 (defn branch? [form]
   (or (and (not (string? form)) (seqable? form))
       (and (delay? form) (realized? form))))
 
+
 (defn children [form]
   (if (delay? form) (list (force form)) (seq form)))
 
+
 (defn walk-seq [form]
   (tree-seq branch? children form))
+
 
 (defn seek
   ([pred coll]
    (seek pred coll nil))
   ([pred coll not-found]
    (reduce (fn [nf x] (if (pred x) (reduced x) nf)) not-found coll)))
+
 
 (defn dfs
   ([pred form]
@@ -123,8 +134,23 @@
    (seek pred (walk-seq form) not-found)))
 
 
+(defn validation-error [message schema data]
+  (let [error     (-> (m/explain schema data)
+                      (me/with-spell-checking)
+                      (me/humanize))
+        as-string (with-out-str (clojure.pprint/pprint error))]
+    (throw (ex-info (str message \newline as-string) {:error error}))))
+
+
+(defn validate! [message schema data]
+  (let [validator (validator-factory schema)]
+    (when-not (validator data)
+      (validation-error message schema data))))
+
+
 (defmacro defmethodset [symbol dispatch-keys & body]
   `(doseq [dispatch# ~dispatch-keys] (defmethod ~symbol dispatch# ~@body)))
+
 
 (def ^:private named-groups
   (let [method
@@ -132,6 +158,7 @@
           (.setAccessible true))]
     (fn [pattern]
       (.invoke method pattern (into-array Object [])))))
+
 
 (defn match-groups [re s]
   (let [matcher (re-matcher re s)]

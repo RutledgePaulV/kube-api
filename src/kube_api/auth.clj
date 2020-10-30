@@ -65,3 +65,26 @@
 
 (defn get-context []
   (or (service-account) (current-context)))
+
+(def user-schema
+  [:or
+   [:map
+    [:client-key-data {:optional true} :string]
+    [:client-certificate-data {:optional true} :string]
+    [:token :string]]
+   [:map
+    [:client-key-data {:optional true} :string]
+    [:client-certificate-data {:optional true} :string]
+    [:username :string]
+    [:password :string]]])
+
+(def cluster-schema
+  [:map
+   [:server :string]
+   [:certificate-authority-data {:optional true} :string]])
+
+(def context-schema
+  [:map
+   [:user user-schema]
+   [:cluster cluster-schema]
+   [:namespace {:optional true} :string]])
