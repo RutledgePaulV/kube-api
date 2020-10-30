@@ -26,7 +26,8 @@
                                 :content-type       "application/json"
                                 :request-method     (keyword method)
                                 :socket-timeout     1000
-                                :connection-timeout 1000}
+                                :connection-timeout 1000
+                                :conn-timeout       1000}
                          (not (strings/blank? token))
                          (assoc-in [:headers "Authorization"] (str "Bearer " token))
                          (and (not (strings/blank? username)) (not (strings/blank? password)))
@@ -63,38 +64,40 @@
   (-> client (meta) :operations (force)))
 
 (defn ops [client]
-  (keys (operation-specification client)))
+  (->> (keys (:operations (operation-specification client)))
+       (sort-by (juxt :kind :group :version :action))))
 
-(defn docs [client op]
-  (get (operation-specification client) (name op)))
+(defn op [client op-selector]
+  (let [views (operation-specification client)]
+    (swag/get-op views op-selector)))
 
-(defn validate-request [client op request]
-  (let [definition     (get (operation-specification client) (name op))
-        request-schema (get definition :request)
+(defn validate-request [client op-selector request]
+  (let [definition     (op client op-selector)
+        request-schema (get definition :request-schema)
         validator      (utils/validator-factory request-schema)]
     (or (validator request)
         (-> (m/explain request-schema request)
             (me/with-spell-checking)
             (me/humanize)))))
 
-(defn example-request [client op]
-  (when-some [{:keys [request]} (get (operation-specification client) (name op))]
-    (gen/generate request)))
+(defn example-request [client op-selector]
+  (when-some [{:keys [request-schema]} (op client op-selector)]
+    (gen/generate request-schema)))
 
-(defn example-response [client op]
-  (when-some [{:keys [response]} (get (operation-specification client) (name op))]
-    (gen/generate (val (first (into (sorted-map) response))))))
+(defn example-response [client op-selector]
+  (when-some [{:keys [response-schema]} (op client op-selector)]
+    (gen/generate (val (first (into (sorted-map) response-schema))))))
 
-(defn invoke [client op request]
-  (let [definition     (get (operation-specification client) (name op))
+(defn invoke [client op-selector request]
+  (let [definition     (op client op-selector)
         request-schema (get definition :request-schema)
         validator      (utils/validator-factory request-schema)]
     (if-not (validator request)
       (-> (m/explain request-schema request)
           (me/with-spell-checking)
           (me/humanize))
-      (let [endpoint     (str "/" (:endpoint definition))
-            method       (:verb definition)
+      (let [endpoint     (:uri definition)
+            method       (:request-method definition)
             rendered-uri (utils/render-template-string endpoint (get-in request [:path-params]))]
         (request*
           client rendered-uri method
