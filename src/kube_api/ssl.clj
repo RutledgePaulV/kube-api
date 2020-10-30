@@ -5,8 +5,11 @@
            [javax.net.ssl TrustManagerFactory KeyManagerFactory]
            [java.security.spec PKCS8EncodedKeySpec]))
 
-(defonce rsa-factory (KeyFactory/getInstance "RSA"))
-(defonce x509-factory (CertificateFactory/getInstance "X.509"))
+(defonce rsa-factory
+  (KeyFactory/getInstance "RSA"))
+
+(defonce x509-factory
+  (CertificateFactory/getInstance "X.509"))
 
 
 (utils/defmemo trust-managers [certificate]
