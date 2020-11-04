@@ -1,7 +1,8 @@
 (ns kube-api.utils
   (:require [clojure.string :as strings]
             [malli.core :as m]
-            [malli.error :as me])
+            [malli.error :as me]
+            [malli.generator :as gen])
   (:import [java.security SecureRandom]
            [java.io ByteArrayInputStream]
            [java.util.regex Pattern]
@@ -26,6 +27,9 @@
 
 (def validator-factory
   (memoize (fn [schema] (m/validator schema))))
+
+(def generator-factory
+  (memoize (fn [schema] (gen/generator schema))))
 
 
 (defn merge+

@@ -1,7 +1,9 @@
 (ns kube-api.experimental.controller
-  "https://www.youtube.com/watch?v=PLSDvFjR9HY"
+  "Implements the informer pattern from the client-go kubernetes client. Useful
+   for building robust controller / observer implementations in Clojure."
   (:require [kube-api.core :as kube])
-  (:import [java.util.concurrent LinkedBlockingQueue]))
+  (:import [java.util.concurrent LinkedBlockingQueue Delayed TimeUnit DelayQueue]
+           [clojure.lang IFn]))
 
 
 (defonce local-cache
@@ -10,8 +12,8 @@
 (defonce delta-queue
   (LinkedBlockingQueue.))
 
-(defonce work-queue
-  (LinkedBlockingQueue.))
+(defonce task-queue
+  (DelayQueue.))
 
 (defn reflector [client fq-op-selector namespace]
   (let [list-op (assoc fq-op-selector :action "list")]))

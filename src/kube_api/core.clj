@@ -128,7 +128,7 @@
   "
   [client op-selector]
   (when-some [{:keys [request-schema]} (docs client op-selector)]
-    (gen/generate request-schema)))
+    (gen/generate (utils/generator-factory request-schema))))
 
 
 (defn gen-response
@@ -141,7 +141,8 @@
   "
   [client op-selector]
   (when-some [{:keys [response-schemas]} (docs client op-selector)]
-    (gen/generate (val (first (into (sorted-map) response-schemas))))))
+    (let [schema (val (first (into (sorted-map) response-schemas)))]
+      (gen/generate (utils/generator-factory schema)))))
 
 
 (defn invoke
