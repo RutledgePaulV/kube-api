@@ -1,7 +1,9 @@
 (ns kube-api.utils
   (:require [clojure.string :as strings]
             [malli.core :as m]
-            [malli.error :as me])
+            [malli.error :as me]
+            [malli.generator :as gen]
+            [clojure.pprint :as pprint])
   (:import [java.security SecureRandom]
            [java.io ByteArrayInputStream]
            [java.util.regex Pattern]
@@ -26,6 +28,9 @@
 
 (def validator-factory
   (memoize (fn [schema] (m/validator schema))))
+
+(def generator-factory
+  (memoize (fn [schema] (gen/generator schema))))
 
 
 (defn merge+
@@ -138,7 +143,7 @@
   (let [error     (-> (m/explain schema data)
                       (me/with-spell-checking)
                       (me/humanize))
-        as-string (with-out-str (clojure.pprint/pprint error))]
+        as-string (with-out-str (pprint/pprint error))]
     (throw (ex-info (str message \newline as-string) {:error error}))))
 
 
