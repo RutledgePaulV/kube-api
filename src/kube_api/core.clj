@@ -1,46 +1,71 @@
 (ns kube-api.core
-  (:require [clj-http.client :as http]
+  (:require [clj-okhttp.core :as http]
             [kube-api.utils :as utils]
             [kube-api.auth :as auth]
             [kube-api.ssl :as ssl]
             [clojure.string :as strings]
             [kube-api.swagger.kubernetes :as swag]
-            [malli.generator :as gen]))
+            [malli.generator :as gen]
+            [muuntaja.core :as m])
+  (:import [java.io InputStream]))
 
 
 (defn request*
   ([client url method]
    (request* client url method {}))
   ([client uri method options]
-   (let [token       (get-in client [:user :token])
-         server      (get-in client [:cluster :server])
-         ca-cert     (get-in client [:cluster :certificate-authority-data])
-         client-cert (get-in client [:cluster :client-certificate-data])
-         client-key  (get-in client [:cluster :client-key-data])
-         username    (get-in client [:user :username])
-         password    (get-in client [:user :password])
-         request     (utils/merge+
-                       (cond-> {:url                  (utils/mk-url server uri)
-                                :as                   :json-strict
-                                :content-type         "application/json"
-                                :request-method       (keyword method)
-                                :socket-timeout       1000
-                                :connection-timeout   1000
-                                :conn-timeout         1000
-                                :throw-exceptions     false
-                                :unexceptional-status (constantly true)}
-                         (not (strings/blank? token))
-                         (assoc-in [:headers "Authorization"] (str "Bearer " token))
-                         (and (not (strings/blank? username)) (not (strings/blank? password)))
-                         (assoc :basic-auth [username password])
-                         (not (strings/blank? ca-cert))
-                         (assoc :trust-managers (ssl/trust-managers ca-cert))
-                         (and (not (strings/blank? client-cert)) (not (strings/blank? client-key)))
-                         (assoc :key-managers (ssl/key-managers client-cert client-key)))
-                       options)
-         response    (http/request request)]
-     (-> (get response :body)
-         (with-meta {:request request :response response})))))
+   (let [token    (get-in client [:user :token])
+         server   (get-in client [:cluster :server])
+         username (get-in client [:user :username])
+         password (get-in client [:user :password])
+         request  (utils/merge+
+                    (cond-> {:url            (utils/mk-url server uri)
+                             :request-method (keyword method)}
+                      (not (strings/blank? token))
+                      (assoc-in [:headers "Authorization"] (str "Bearer " token))
+                      (and (not (strings/blank? username)) (not (strings/blank? password)))
+                      (assoc :basic-auth [username password]))
+                    options)
+         response (http/request* (:http-client client) request)]
+     (let [body (get response :body)]
+       (-> (if (instance? InputStream body)
+             (m/decode "application/json" body)
+             body)
+           (with-meta {:request request :response response}))))))
+
+(defn connect*
+  ([client url method]
+   (request* client url method {}))
+  ([client uri method options]
+   (let [token    (get-in client [:user :token])
+         server   (get-in client [:cluster :server])
+         username (get-in client [:user :username])
+         password (get-in client [:user :password])
+         request  (utils/merge+
+                    (cond-> {:url            (utils/mk-url server uri)
+                             :request-method (keyword method)}
+                      (not (strings/blank? token))
+                      (assoc-in [:headers "Authorization"] (str "Bearer " token))
+                      (and (not (strings/blank? username)) (not (strings/blank? password)))
+                      (assoc :basic-auth [username password]))
+                    options)]
+     (http/connect (:http-client client) request options))))
+
+
+(defn create-http-client [options]
+  (let [ca-cert            (get-in options [:cluster :certificate-authority-data])
+        client-cert        (get-in options [:cluster :client-certificate-data])
+        client-key         (get-in options [:cluster :client-key-data])
+        trust-managers     (when-not (strings/blank? ca-cert)
+                             (ssl/trust-managers ca-cert))
+        key-managers       (when-not (or (strings/blank? client-cert)
+                                         (strings/blank? client-key))
+                             (ssl/key-managers client-cert client-key))
+        ssl-socket-factory (ssl/ssl-socket-factory trust-managers key-managers)
+        x509-trust-manager (utils/seek ssl/x509-trust-manager? trust-managers)]
+    (http/create-client
+      {:ssl-socket-factory ssl-socket-factory
+       :x509-trust-manager x509-trust-manager})))
 
 
 (defn create-client
@@ -54,10 +79,11 @@
   ([context]
    (if (map? context)
      (do (utils/validate! "Invalid context." auth/context-schema context)
-         (with-meta context
-           (let [swagger    (delay (request* context "/openapi/v2" :get))
-                 operations (delay (swag/kube-swagger->operation-views (deref swagger)))]
-             {:swagger swagger :operations operations})))
+         (let [full-context (assoc context :http-client (create-http-client context))]
+           (with-meta full-context
+             (let [swagger    (delay (request* full-context "/openapi/v2" :get))
+                   operations (delay (swag/kube-swagger->operation-views (deref swagger)))]
+               {:swagger swagger :operations operations}))))
      (recur (auth/select-context context)))))
 
 
@@ -167,12 +193,61 @@
        (utils/validation-error "Invalid request." request-schema request)
        (let [endpoint     (:uri definition)
              method       (:request-method definition)
-             rendered-uri (utils/render-template-string endpoint (get-in request [:path-params]))
-             is-watching  (get-in request [:query-params :watch])]
+             rendered-uri (utils/render-template-string endpoint (get-in request [:path-params]))]
          (request*
            client rendered-uri method
            (cond-> {}
              (not-empty (:query-params request))
              (assoc :query-params (:query-params request))
              (not-empty (:body-params request))
-             (assoc :form-params (:form-params request)))))))))
+             (assoc :form-params (:body-params request)))))))))
+
+
+(defn watch
+  ([client op-selector {:keys [on-event on-error on-closed] :as callbacks}]
+   (watch client op-selector {} callbacks))
+  ([client op-selector request
+    {:keys [on-event on-error on-closed]
+     :or   {on-event  (fn [message])
+            on-error  (fn [exception])
+            on-closed (fn [code reason])}}]
+   (let [definition     (docs client (assoc op-selector :action "watch"))
+         request-schema (get definition :request-schema)
+         validator      (utils/validator-factory request-schema)]
+     (if-not (validator request)
+       (utils/validation-error "Invalid request." request-schema request)
+       (let [endpoint     (:uri definition)
+             method       (:request-method definition)
+             rendered-uri (utils/render-template-string endpoint (get-in request [:path-params]))]
+         (connect*
+           client rendered-uri method
+           (cond-> {}
+             (not-empty (:query-params request))
+             (assoc :query-params (:query-params request))
+             (not-empty (:body-params request))
+             (assoc :form-params (:body-params request))
+             :always
+             (merge {:on-bytes   (fn [socket message]
+                                   (on-event (m/decode "application/json" message)))
+                     :on-text    (fn [socket message]
+                                   (on-event (m/decode "application/json" message)))
+                     :on-closed  (fn [socket code reason]
+                                   (on-closed code reason))
+                     :on-failure (fn [socket exception response]
+                                   (on-error exception))}))))))))
+
+
+
+(comment
+
+  (def client (create-client "microk8s"))
+
+  (watch client
+         {:action "watch" :kind "Deployment"}
+         {:path-params  {:namespace "kube-system"}
+          :query-params {:watch true}}
+         {:on-event
+          (fn [message]
+            (println (get-in message [:object :metadata :labels])))})
+
+  )

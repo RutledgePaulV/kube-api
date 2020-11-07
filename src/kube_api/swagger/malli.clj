@@ -26,6 +26,9 @@
     (contains? node :type)
     (get node :type)
 
+    (true? (get node :x-kubernetes-int-or-string))
+    "x-kubernetes-int-or-string"
+
     ; some swagger defs are missing type decls
     ; so we have to discover them using the
     ; shape i guess... RAWR
@@ -120,6 +123,9 @@
      "date-time" [:re DateTimePattern]
      "int-or-string" [:or :int [:re #"\d+"]]
      :string)])
+
+(defmethod swagger->malli* "x-kubernetes-int-or-string" [node context registry]
+  [registry [:or :int :string]])
 
 (defmethod swagger->malli* "integer" [node context registry]
   [registry :int])
