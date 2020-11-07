@@ -33,6 +33,24 @@
              body)
            (with-meta {:request request :response response}))))))
 
+(defn connect*
+  ([client url method]
+   (request* client url method {}))
+  ([client uri method options]
+   (let [token    (get-in client [:user :token])
+         server   (get-in client [:cluster :server])
+         username (get-in client [:user :username])
+         password (get-in client [:user :password])
+         request  (utils/merge+
+                    (cond-> {:url            (utils/mk-url server uri)
+                             :request-method (keyword method)}
+                      (not (strings/blank? token))
+                      (assoc-in [:headers "Authorization"] (str "Bearer " token))
+                      (and (not (strings/blank? username)) (not (strings/blank? password)))
+                      (assoc :basic-auth [username password]))
+                    options)]
+     (http/connect (:http-client client) request options))))
+
 
 (defn create-http-client [options]
   (let [ca-cert            (get-in options [:cluster :certificate-authority-data])
@@ -175,12 +193,61 @@
        (utils/validation-error "Invalid request." request-schema request)
        (let [endpoint     (:uri definition)
              method       (:request-method definition)
-             rendered-uri (utils/render-template-string endpoint (get-in request [:path-params]))
-             is-watching  (get-in request [:query-params :watch])]
+             rendered-uri (utils/render-template-string endpoint (get-in request [:path-params]))]
          (request*
            client rendered-uri method
            (cond-> {}
              (not-empty (:query-params request))
              (assoc :query-params (:query-params request))
              (not-empty (:body-params request))
-             (assoc :form-params (:form-params request)))))))))
+             (assoc :form-params (:body-params request)))))))))
+
+
+(defn watch
+  ([client op-selector {:keys [on-event on-error on-closed] :as callbacks}]
+   (watch client op-selector {} callbacks))
+  ([client op-selector request
+    {:keys [on-event on-error on-closed]
+     :or   {on-event  (fn [message])
+            on-error  (fn [exception])
+            on-closed (fn [code reason])}}]
+   (let [definition     (docs client (assoc op-selector :action "watch"))
+         request-schema (get definition :request-schema)
+         validator      (utils/validator-factory request-schema)]
+     (if-not (validator request)
+       (utils/validation-error "Invalid request." request-schema request)
+       (let [endpoint     (:uri definition)
+             method       (:request-method definition)
+             rendered-uri (utils/render-template-string endpoint (get-in request [:path-params]))]
+         (connect*
+           client rendered-uri method
+           (cond-> {}
+             (not-empty (:query-params request))
+             (assoc :query-params (:query-params request))
+             (not-empty (:body-params request))
+             (assoc :form-params (:body-params request))
+             :always
+             (merge {:on-bytes   (fn [socket message]
+                                   (on-event (m/decode "application/json" message)))
+                     :on-text    (fn [socket message]
+                                   (on-event (m/decode "application/json" message)))
+                     :on-closed  (fn [socket code reason]
+                                   (on-closed code reason))
+                     :on-failure (fn [socket exception response]
+                                   (on-error exception))}))))))))
+
+
+
+(comment
+
+  (def client (create-client "microk8s"))
+
+  (watch client
+         {:action "watch" :kind "Deployment"}
+         {:path-params  {:namespace "kube-system"}
+          :query-params {:watch true}}
+         {:on-event
+          (fn [message]
+            (println (get-in message [:object :metadata :labels])))})
+
+  )

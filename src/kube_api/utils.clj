@@ -79,11 +79,6 @@
     chars))
 
 
-(defmacro defmemo [& defnargs]
-  `(doto (defn ~@defnargs)
-     (alter-var-root #(with-meta (memoize %) (meta %)))))
-
-
 (defn base64-string->bytes ^"[B" [^String s]
   (.decode (Base64/getDecoder) s))
 
