@@ -2,7 +2,8 @@
   (:require [clojure.string :as strings]
             [malli.core :as m]
             [malli.error :as me]
-            [malli.generator :as gen])
+            [malli.generator :as gen]
+            [clojure.pprint :as pprint])
   (:import [java.security SecureRandom]
            [java.io ByteArrayInputStream]
            [java.util.regex Pattern]
@@ -78,11 +79,6 @@
     chars))
 
 
-(defmacro defmemo [& defnargs]
-  `(doto (defn ~@defnargs)
-     (alter-var-root #(with-meta (memoize %) (meta %)))))
-
-
 (defn base64-string->bytes ^"[B" [^String s]
   (.decode (Base64/getDecoder) s))
 
@@ -142,7 +138,7 @@
   (let [error     (-> (m/explain schema data)
                       (me/with-spell-checking)
                       (me/humanize))
-        as-string (with-out-str (clojure.pprint/pprint error))]
+        as-string (with-out-str (pprint/pprint error))]
     (throw (ex-info (str message \newline as-string) {:error error}))))
 
 
