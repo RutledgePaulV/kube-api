@@ -1,4 +1,4 @@
-(ns kube-api.experimental.listwatch
+(ns kube-api.controllers.listwatch
   (:require [kube-api.core :as kube])
   (:import [okhttp3 Response]))
 
@@ -14,10 +14,10 @@
   (letfn [(list-resources []
             (let [list-op       (-> op (assoc-in [:action] "list"))
                   list-request  (-> request
-                                    (assoc-in [:query-params :watch] false))
+                                    (assoc-in [:query-params :watch] false)
+                                    (assoc-in [:query-params :resourceVersion] "0"))
                   list-response (kube/invoke client list-op list-request)]
-              (doseq [item (:items list-response)]
-                (on-added item))
+              (doseq [item (:items list-response)] (on-added item))
               list-response))
           (watch-resources [resource-version]
             (let [watch-op
@@ -39,7 +39,9 @@
                                  "ADDED" (on-added object)
                                  "MODIFIED" (on-modified object)
                                  "DELETED" (on-deleted object)
-                                 "BOOKMARK" nil)))
+                                 "BOOKMARK" nil
+                                 "ERROR" nil                ; todo
+                                 )))
                            :on-error
                            (fn [exception ^Response response]
                              (when (= 410 (.code response))

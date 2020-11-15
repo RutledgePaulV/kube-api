@@ -1,4 +1,4 @@
-(ns kube-api.experimental.queue
+(ns kube-api.controllers.workqueue
   "Exponential back-off queue processing."
   (:require [clojure.tools.logging :as log])
   (:import [java.util.concurrent Delayed TimeUnit DelayQueue Executors ThreadFactory ExecutorService]
