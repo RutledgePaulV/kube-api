@@ -3,9 +3,17 @@
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-core.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-core)
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-controllers.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-controllers)
 
+---
+
 ## Modules
 
 ### kube-api
+
+This is an uber module that just bundles all the modules listed below.
+
+---
+
+### kube-api-core
 
 A comprehensive, idiomatic, and data driven Kubernetes client for Clojure. The available operations are dynamically
 constructed from the swagger definition hosted by the Kubernetes cluster you target so it should always be version
@@ -57,6 +65,8 @@ Inspired by:
 
 ```
 
+---
+
 ### kube-api-controllers
 
 Satisfies the same goals as the tools/cache package from the standard go client. Provides machinery for writing
@@ -72,6 +82,8 @@ Inspired by:
 ```clojure
 
 ```
+
+---
 
 ## License
 
