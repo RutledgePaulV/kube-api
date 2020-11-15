@@ -66,17 +66,23 @@
 (defn get-context []
   (or (service-account) (current-context)))
 
+(def token-user-schema
+  [:map
+   [:client-key-data {:optional true} :string]
+   [:client-certificate-data {:optional true} :string]
+   [:token :string]])
+
+(def basic-auth-user-schema
+  [:map
+   [:client-key-data {:optional true} :string]
+   [:client-certificate-data {:optional true} :string]
+   [:username :string]
+   [:password :string]])
+
 (def user-schema
   [:or
-   [:map
-    [:client-key-data {:optional true} :string]
-    [:client-certificate-data {:optional true} :string]
-    [:token :string]]
-   [:map
-    [:client-key-data {:optional true} :string]
-    [:client-certificate-data {:optional true} :string]
-    [:username :string]
-    [:password :string]]])
+   token-user-schema
+   basic-auth-user-schema])
 
 (def cluster-schema
   [:map

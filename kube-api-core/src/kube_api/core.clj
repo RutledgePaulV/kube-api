@@ -52,7 +52,7 @@
      (http/connect (:http-client client) request options))))
 
 
-(defn create-http-client [options]
+(defn- create-http-client [options]
   (let [ca-cert            (get-in options [:cluster :certificate-authority-data])
         client-cert        (get-in options [:cluster :client-certificate-data])
         client-key         (get-in options [:cluster :client-key-data])
@@ -78,8 +78,8 @@
   ([] (create-client (auth/get-context)))
   ([context]
    (if (map? context)
-     (do (utils/validate! "Invalid context." auth/context-schema context)
-         (let [full-context (assoc context :http-client (create-http-client context))]
+     (do (utils/validate! "Invalid context." auth/context-schema (dissoc context :http-client))
+         (let [full-context (update context :http-client #(or % (create-http-client context)))]
            (with-meta full-context
              (let [swagger    (delay (request* full-context "/openapi/v2" :get))
                    operations (delay (swag/kube-swagger->operation-views (deref swagger)))]
@@ -154,7 +154,7 @@
   "
   [client op-selector]
   (when-some [{:keys [request-schema]} (docs client op-selector)]
-    (gen/generate request-schema)))
+    (gen/generate (utils/generator-factory request-schema))))
 
 
 (defn gen-response
@@ -167,7 +167,8 @@
   "
   [client op-selector]
   (when-some [{:keys [response-schemas]} (docs client op-selector)]
-    (gen/generate (val (first (into (sorted-map) response-schemas))))))
+    (let [schema (val (first (into (sorted-map) response-schemas)))]
+      (gen/generate (utils/generator-factory schema)))))
 
 
 (defn invoke
@@ -211,7 +212,7 @@
      :or   {on-event  (fn [message])
             on-error  (fn [exception])
             on-closed (fn [code reason])}}]
-   (let [definition     (docs client (assoc op-selector :action "watch"))
+   (let [definition     (docs client op-selector)
          request-schema (get definition :request-schema)
          validator      (utils/validator-factory request-schema)]
      (if-not (validator request)
@@ -234,7 +235,7 @@
                      :on-closed  (fn [socket code reason]
                                    (on-closed code reason))
                      :on-failure (fn [socket exception response]
-                                   (on-error exception))}))))))))
+                                   (on-error exception response))}))))))))
 
 
 
