@@ -3,7 +3,8 @@
             [malli.core :as m]
             [malli.error :as me]
             [malli.generator :as gen]
-            [clojure.pprint :as pprint])
+            [clojure.pprint :as pprint]
+            [clojure.java.io :as io])
   (:import [java.security SecureRandom]
            [java.io ByteArrayInputStream]
            [java.util.regex Pattern]
@@ -33,6 +34,8 @@
 (def generator-factory
   (memoize (fn [schema] (gen/generator schema))))
 
+(defn in-kubernetes? []
+  (not (strings/blank? (System/getenv "KUBERNETES_SERVICE_HOST"))))
 
 (defn merge+
   ([] {})

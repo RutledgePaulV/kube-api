@@ -11,7 +11,8 @@
             [clojure.tools.logging :as log]))
 
 
-(defonce validation (atom false))
+(defonce validation
+  (atom (delay (not (utils/in-kubernetes?)))))
 
 
 (defn- create-http-client [options]
@@ -32,7 +33,7 @@
 
 
 (defn- prepare-invoke-request [client op-selector request]
-  (let [validate? (deref validation)
+  (let [validate? (force (deref validation))
         {:keys [op-selector-schema] :as views} (-> client (meta) :operations (force))
         _         (when validate? (utils/validate! "Invalid op selector." op-selector-schema op-selector))
         {:keys [uri request-method request-schema]} (swag/get-op views op-selector)
@@ -47,7 +48,8 @@
 
 (defn set-validation!
   "Enable or disable client-side validation of requests per the server's
-   json schema prior to submitting to the remote API. Off by default."
+   json schema prior to submitting to the remote API. Defaults to off if
+   the process is believed to be running in kubernetes, on otherwise."
   [true-or-false]
   (reset! validation true-or-false))
 
@@ -195,8 +197,10 @@
    (let [final-callbacks
          (-> {:on-open    (fn default-on-open [socket response]
                             (log/infof "Websocket connection opened with response %s." (str response)))
-              :on-bytes   (fn default-on-bytes [socket message])
-              :on-text    (fn default-on-text [socket message])
+              :on-bytes   (fn default-on-bytes [socket message]
+                            (log/info "Websocket received byte frame."))
+              :on-text    (fn default-on-text [socket message]
+                            (log/info "Websocket received text frame."))
               :on-closing (fn default-on-closing [socket code reason]
                             (log/infof "Websocket connection is closing with code %d and reason %s." code reason))
               :on-closed  (fn default-on-closed [socket code reason]
@@ -208,7 +212,9 @@
                                 (fn [socket message]
                                   (handler socket
                                            (try (m/decode "application/json" message)
-                                                (catch Exception e message)))))))
+                                                (catch Exception e
+                                                  ; unsure if k8s ever sends non-json text frames
+                                                  message)))))))
          final-request
          (prepare-invoke-request client op-selector request)]
      (http/connect http-client final-request final-callbacks))))
