@@ -1,6 +1,7 @@
 (ns kube-api.controllers.workqueue
   "Exponential back-off queue processing."
-  (:require [clojure.tools.logging :as log])
+  (:require [clojure.tools.logging :as log]
+            [kube-api.controllers.utils :as utils])
   (:import [java.util.concurrent Delayed TimeUnit DelayQueue Executors ThreadFactory ExecutorService]
            [clojure.lang IFn ISeq]))
 
@@ -24,17 +25,6 @@
     (= (.-task this) (.-task ^TimeoutTask that))))
 
 
-(defn backoff-seq
-  "Returns an infinite seq of exponential back-off timeouts with random jitter."
-  [max]
-  (->>
-    (lazy-cat
-      (->> (cons 0 (iterate (partial * 2) 1000))
-           (take-while #(< % max)))
-      (repeat max))
-    (map (fn [x] (+ x (rand-int 1000))))))
-
-
 (defn create-queue []
   (DelayQueue.))
 
@@ -52,7 +42,7 @@
               (catch InterruptedException e
                 ::halt)
               (catch Throwable e
-                (let [[backoff & remainder] (or (.-backoffs result) (backoff-seq 300000))
+                (let [[backoff & remainder] (or (.-backoffs result) (utils/backoff-seq 300000))
                       current-time (System/currentTimeMillis)
                       retry-time   (+ current-time backoff)
                       retry-task   (TimeoutTask. retry-time (.-task result) remainder)]

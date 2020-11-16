@@ -26,4 +26,7 @@
   :dependencies
   [[org.clojure/clojure "1.10.1"]
    [org.clojars.rutledgepaulv/kube-api-core "0.1.0-SNAPSHOT"]
-   [org.clojure/core.async "1.3.610"]])
+   [org.clojure/core.async "1.3.610"]]
+
+  :profiles
+  {:dev {:dependencies [[lambdaisland/deep-diff2 "2.0.108"]]}})

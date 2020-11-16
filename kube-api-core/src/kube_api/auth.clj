@@ -24,19 +24,18 @@
        (apply utils/merge+)))
 
 (defn service-account []
-  (let [namespace (io/file "/run/secrets/kubernetes.io/serviceaccount/namespace")
-        ca-cert   (io/file "/run/secrets/kubernetes.io/serviceaccount/ca.crt")
-        token     (io/file "/run/secrets/kubernetes.io/serviceaccount/token")]
+  (let [namespace    (io/file "/run/secrets/kubernetes.io/serviceaccount/namespace")
+        ca-cert      (io/file "/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+        token        (io/file "/run/secrets/kubernetes.io/serviceaccount/token")
+        service-host (System/getenv "KUBERNETES_SERVICE_HOST")
+        service-port (System/getenv "KUBERNETES_SERVICE_PORT_HTTPS")]
     (when (and (readable? namespace) (readable? ca-cert) (readable? token)
-               (not (strings/blank? (System/getenv "KUBERNETES_SERVICE_HOST")))
-               (not (strings/blank? (System/getenv "KUBERNETES_SERVICE_PORT_HTTPS"))))
+               (not (strings/blank? service-host)) (not (strings/blank? service-port)))
       (let [token      (slurp token)
             namespace  (slurp namespace)
             ca-cert    (slurp ca-cert)
-            host       (System/getenv "KUBERNETES_SERVICE_HOST")
-            port       (System/getenv "KUBERNETES_SERVICE_PORT_HTTPS")
-            endpoint   (cond-> (str "https://" host)
-                         (not= port "443") (str ":" port))
+            endpoint   (cond-> (str "https://" service-host)
+                         (not= service-port "443") (str ":" service-port))
             clean-cert (utils/pem-body ca-cert)]
         {:user      {:token token}
          :cluster   {:certificate-authority-data clean-cert
