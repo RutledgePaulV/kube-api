@@ -50,6 +50,9 @@
    "
   #'dispatch)
 
+(def ^:dynamic *recurse* swagger->malli*)
+
+
 (defmethod swagger->malli* :default [node context registry]
   (throw (ex-info "Undefined conversion! Teach me." {:node node})))
 
@@ -59,29 +62,23 @@
         definition (get-in context path)
         identifier (peek path)]
     (if (contains? registry identifier)
-      [registry [:ref identifier]]
-      (let [new-registry   (assoc registry identifier nil)
+      (do (when (utils/promise? (get registry identifier))
+            (deliver (get registry identifier) true))
+          [registry [:ref identifier]])
+      (let [prom           (promise)
+            new-registry   (assoc registry identifier prom)
             method         (get-method swagger->malli* identifier)
             default-method (get-method swagger->malli* :default)
             [child-reg child]
             (if-not (identical? method default-method)
               (method identifier context new-registry)
-              (swagger->malli* definition context new-registry))]
-
-        ; this is much faster, but it produces schemas with more registry
-        ; indirection than is actually required since it represents an
-        ; eager approach to registry registration
-        #_[(update child-reg identifier #(or % child)) child]
-
-        ; this is slow since it backtracks over the generated schema
-        ; to see if it actually used the available recursive reference
-        ; and if it did not then it removes the definition from the registry
-        (if (utils/dfs #(= [:ref identifier] %) child)
-          [(update child-reg identifier #(or % child)) [:ref identifier]]
-          [(if (get child-reg identifier) child-reg (dissoc child-reg identifier)) child])))))
+              (*recurse* definition context new-registry))]
+        (if (realized? prom)
+          [(update child-reg identifier #(if (utils/promise? %1) child (or %1 child))) [:ref identifier]]
+          [(if-not (utils/promise? (get child-reg identifier)) child-reg (dissoc child-reg identifier)) child])))))
 
 (defmethod swagger->malli* "array" [node context registry]
-  (let [[child-registry child] (swagger->malli* (:items node) context registry)]
+  (let [[child-registry child] (*recurse* (:items node) context registry)]
     [child-registry [:vector child]]))
 
 (defmethod swagger->malli* "object" [node context registry]
@@ -97,14 +94,14 @@
            [:map-of :string 'any?])]
         (and (empty? props) (not closed))
         (let [[child-registry child]
-              (swagger->malli* (:additionalProperties node) context registry)]
+              (*recurse* (:additionalProperties node) context registry)]
           [child-registry
            (if description
              [:map-of {:description description} :string child]
              [:map-of :string child])])
         (not-empty props)
         (let [children (map (fn [[k v]]
-                              (let [[child-registry child] (swagger->malli* v context registry)
+                              (let [[child-registry child] (*recurse* v context registry)
                                     description' (get v :description)]
                                 {:registry child-registry
                                  :schema   [k (cond-> {:optional (not (contains? required k))}
@@ -143,5 +140,7 @@
   "How you exchange a swagger specification for a malli schema. Must specify
    the 'root' chunk of swagger spec that you want to convert into a schema."
   [swagger-spec root]
-  (let [[registry schema] (swagger->malli* root swagger-spec {})]
+  (let [[registry schema]
+        (binding [*recurse* (memoize swagger->malli*)]
+          (swagger->malli* root swagger-spec {}))]
     (if (empty? registry) schema [:schema {:registry registry} schema])))

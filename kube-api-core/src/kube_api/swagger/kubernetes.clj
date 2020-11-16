@@ -25,7 +25,7 @@
     :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool}
   [_ context registry]
   (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
-        [child-registry child] (malli/swagger->malli* json-schema-props context registry)]
+        [child-registry child] (malli/*recurse* json-schema-props context registry)]
     [child-registry [:or {:default true} child :boolean]]))
 
 (utils/defmethodset malli/swagger->malli*
@@ -33,7 +33,7 @@
     :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrArray}
   [_ context registry]
   (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
-        [child-registry child] (malli/swagger->malli* json-schema-props context registry)]
+        [child-registry child] (malli/*recurse* json-schema-props context registry)]
     [child-registry [:or child [:vector child]]]))
 
 (utils/defmethodset malli/swagger->malli*
@@ -41,7 +41,7 @@
     :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray}
   [_ context registry]
   (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
-        [child-registry child] (malli/swagger->malli* json-schema-props context registry)]
+        [child-registry child] (malli/*recurse* json-schema-props context registry)]
     [child-registry [:or child [:vector :string]]]))
 
 (defn kubernetes-group-version-kind [op]

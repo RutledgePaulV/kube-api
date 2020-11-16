@@ -7,7 +7,8 @@
   (:import [java.security SecureRandom]
            [java.io ByteArrayInputStream]
            [java.util.regex Pattern]
-           [java.util Base64]))
+           [java.util Base64]
+           [clojure.lang IPending]))
 
 
 (defonce random-gen
@@ -107,31 +108,14 @@
        (into [])))
 
 
-(defn branch? [form]
-  (or (and (not (string? form)) (seqable? form))
-      (and (delay? form) (realized? form))))
-
-
-(defn children [form]
-  (if (delay? form) (list (force form)) (seq form)))
-
-
-(defn walk-seq [form]
-  (tree-seq branch? children form))
-
+(defn promise? [x]
+  (instance? IPending x))
 
 (defn seek
   ([pred coll]
    (seek pred coll nil))
   ([pred coll not-found]
    (reduce (fn [nf x] (if (pred x) (reduced x) nf)) not-found coll)))
-
-
-(defn dfs
-  ([pred form]
-   (seek pred (walk-seq form)))
-  ([pred form not-found]
-   (seek pred (walk-seq form) not-found)))
 
 
 (defn validation-error [message schema data]
