@@ -58,10 +58,6 @@
     [false false] (str a "/" b)))
 
 
-(defn mk-url [& segments]
-  (reduce join-segment (flatten segments)))
-
-
 (defn pem-body [s]
   (strings/join ""
     (-> s

@@ -5,51 +5,13 @@
             [kube-api.ssl :as ssl]
             [clojure.string :as strings]
             [kube-api.swagger.kubernetes :as swag]
+            [kube-api.middleware :as mw]
             [malli.generator :as gen]
-            [muuntaja.core :as m])
-  (:import [java.io InputStream]))
+            [muuntaja.core :as m]
+            [clojure.tools.logging :as log]))
 
 
-(defn request*
-  ([client url method]
-   (request* client url method {}))
-  ([client uri method options]
-   (let [token    (get-in client [:user :token])
-         server   (get-in client [:cluster :server])
-         username (get-in client [:user :username])
-         password (get-in client [:user :password])
-         request  (utils/merge+
-                    (cond-> {:url            (utils/mk-url server uri)
-                             :request-method (keyword method)}
-                      (not (strings/blank? token))
-                      (assoc-in [:headers "Authorization"] (str "Bearer " token))
-                      (and (not (strings/blank? username)) (not (strings/blank? password)))
-                      (assoc :basic-auth [username password]))
-                    options)
-         response (http/request* (:http-client client) request)]
-     (let [body (get response :body)]
-       (-> (if (instance? InputStream body)
-             (m/decode "application/json" body)
-             body)
-           (with-meta {:request request :response response}))))))
-
-(defn connect*
-  ([client url method]
-   (request* client url method {}))
-  ([client uri method options]
-   (let [token    (get-in client [:user :token])
-         server   (get-in client [:cluster :server])
-         username (get-in client [:user :username])
-         password (get-in client [:user :password])
-         request  (utils/merge+
-                    (cond-> {:url            (utils/mk-url server uri)
-                             :request-method (keyword method)}
-                      (not (strings/blank? token))
-                      (assoc-in [:headers "Authorization"] (str "Bearer " token))
-                      (and (not (strings/blank? username)) (not (strings/blank? password)))
-                      (assoc :basic-auth [username password]))
-                    options)]
-     (http/connect (:http-client client) request options))))
+(defonce validation (atom false))
 
 
 (defn- create-http-client [options]
@@ -58,14 +20,36 @@
         client-key         (get-in options [:cluster :client-key-data])
         trust-managers     (when-not (strings/blank? ca-cert)
                              (ssl/trust-managers ca-cert))
-        key-managers       (when-not (or (strings/blank? client-cert)
-                                         (strings/blank? client-key))
+        key-managers       (when-not (or (strings/blank? client-cert) (strings/blank? client-key))
                              (ssl/key-managers client-cert client-key))
         ssl-socket-factory (ssl/ssl-socket-factory trust-managers key-managers)
-        x509-trust-manager (utils/seek ssl/x509-trust-manager? trust-managers)]
+        x509-trust-manager (utils/seek ssl/x509-trust-manager? trust-managers)
+        prepare-request-mw (fn [handler] (mw/wrap-prepare-request handler options))]
     (http/create-client
       {:ssl-socket-factory ssl-socket-factory
-       :x509-trust-manager x509-trust-manager})))
+       :x509-trust-manager x509-trust-manager
+       :middleware         [mw/wrap-prepare-response prepare-request-mw]})))
+
+
+(defn- prepare-invoke-request [client op-selector request]
+  (let [validate? (deref validation)
+        {:keys [op-selector-schema] :as views} (-> client (meta) :operations (force))
+        _         (when validate? (utils/validate! "Invalid op selector." op-selector-schema op-selector))
+        {:keys [uri request-method request-schema]} (swag/get-op views op-selector)
+        _         (when validate? (utils/validate! "Invalid request." request-schema request))]
+    (let [rendered-uri (utils/render-template-string uri (get-in request [:path-params]))]
+      (cond-> {:request-method request-method :url rendered-uri}
+        (not-empty (:query-params request))
+        (assoc :query-params (:query-params request))
+        (not-empty (:body-params request))
+        (assoc :form-params (:body-params request))))))
+
+
+(defn set-validation!
+  "Enable or disable client-side validation of requests per the server's
+   json schema prior to submitting to the remote API. Off by default."
+  [true-or-false]
+  (reset! validation true-or-false))
 
 
 (defn create-client
@@ -79,9 +63,9 @@
   ([context]
    (if (map? context)
      (do (utils/validate! "Invalid context." auth/context-schema (dissoc context :http-client))
-         (let [full-context (update context :http-client #(or % (create-http-client context)))]
+         (let [{:keys [http-client] :as full-context} (update context :http-client #(or % (create-http-client context)))]
            (with-meta full-context
-             (let [swagger    (delay (request* full-context "/openapi/v2" :get))
+             (let [swagger    (delay (http/get http-client "/openapi/v2"))
                    operations (delay (swag/kube-swagger->operation-views (deref swagger)))]
                {:swagger swagger :operations operations}))))
      (recur (auth/select-context context)))))
@@ -108,7 +92,7 @@
    (filter #(= (select-keys % (keys op-filter)) op-filter) (ops client))))
 
 
-(defn docs
+(defn spec
   "Returns the full specification for a single operation. Includes schemas describing
    the required data to invoke the operation and the data that will be returned in a
    response.
@@ -126,7 +110,7 @@
       (utils/validation-error "Invalid op selector." schema op-selector))))
 
 
-(defn validate
+(defn validate-request
   "Validates a request payload against the spec for the chosen operation identified
    by the op selector. Returns true if the request is considered valid according to
    the schema otherwise throws an exception containing a description of the validation
@@ -138,13 +122,11 @@
 
    "
   [client op-selector request]
-  (let [definition     (docs client op-selector)
-        request-schema (get definition :request-schema)
-        validator      (utils/validator-factory request-schema)]
-    (or (validator request) (utils/validation-error "Invalid request." request-schema request))))
+  (let [{:keys [request-schema]} (spec client op-selector)]
+    (utils/validate! "Invalid request." request-schema request)))
 
 
-(defn gen-request
+(defn generate-request
   "Returns example request data demonstrating the data shape required to make a request
    for the operation identified by the op selector. Note that this can take quite a while
    because the schemas are so large.
@@ -153,11 +135,11 @@
    op-selector - a full or partial operation selector
   "
   [client op-selector]
-  (when-some [{:keys [request-schema]} (docs client op-selector)]
+  (when-some [{:keys [request-schema]} (spec client op-selector)]
     (gen/generate (utils/generator-factory request-schema))))
 
 
-(defn gen-response
+(defn generate-response
   "Returns example response data demonstrating the data shape returned from
    a successful request. Note that this can take quite a while because the
    schemas are so large.
@@ -166,7 +148,7 @@
    op-selector - a full or partial operation selector
   "
   [client op-selector]
-  (when-some [{:keys [response-schemas]} (docs client op-selector)]
+  (when-some [{:keys [response-schemas]} (spec client op-selector)]
     (let [schema (val (first (into (sorted-map) response-schemas)))]
       (gen/generate (utils/generator-factory schema)))))
 
@@ -176,66 +158,60 @@
   targeted by the client. Returns the body of the response augmented with
   clojure metadata containing the raw http request and the raw http response.
 
+   2 arity:
    client      - a client instance
    op-selector - a full or partial operation selector
+
+   3 arity:
    request     - a request payload to submit for the operation
 
+   5 arity:
+   respond     - a callback function if you want to invoke asynchronously.
+   raise       - an error callback function if you want to invoke asynchronously.
   "
   ([client op-selector]
    (invoke client op-selector
            {:body-params  {}
             :query-params {}
             :path-params  {:namespace (or (get client :namespace) "default")}}))
-  ([client op-selector request]
-   (let [definition     (docs client op-selector)
-         request-schema (get definition :request-schema)
-         validator      (utils/validator-factory request-schema)]
-     (if-not (validator request)
-       (utils/validation-error "Invalid request." request-schema request)
-       (let [endpoint     (:uri definition)
-             method       (:request-method definition)
-             rendered-uri (utils/render-template-string endpoint (get-in request [:path-params]))]
-         (request*
-           client rendered-uri method
-           (cond-> {}
-             (not-empty (:query-params request))
-             (assoc :query-params (:query-params request))
-             (not-empty (:body-params request))
-             (assoc :form-params (:body-params request)))))))))
+  ([{:keys [http-client] :as client} op-selector request]
+   (let [final-request (prepare-invoke-request client op-selector request)]
+     (http/request* http-client final-request)))
+  ([{:keys [http-client] :as client} op-selector request respond raise]
+   (let [final-request (prepare-invoke-request client op-selector request)]
+     (http/request* http-client final-request respond raise))))
 
 
-(defn watch
-  ([client op-selector {:keys [on-event on-error on-closed] :as callbacks}]
-   (watch client op-selector {} callbacks))
-  ([client op-selector request
-    {:keys [on-event on-error on-closed]
-     :or   {on-event  (fn [message])
-            on-error  (fn [exception])
-            on-closed (fn [code reason])}}]
-   (let [definition     (docs client op-selector)
-         request-schema (get definition :request-schema)
-         validator      (utils/validator-factory request-schema)]
-     (if-not (validator request)
-       (utils/validation-error "Invalid request." request-schema request)
-       (let [endpoint     (:uri definition)
-             method       (:request-method definition)
-             rendered-uri (utils/render-template-string endpoint (get-in request [:path-params]))]
-         (connect*
-           client rendered-uri method
-           (cond-> {}
-             (not-empty (:query-params request))
-             (assoc :query-params (:query-params request))
-             (not-empty (:body-params request))
-             (assoc :form-params (:body-params request))
-             :always
-             (merge {:on-bytes   (fn [socket message]
-                                   (on-event (m/decode "application/json" message)))
-                     :on-text    (fn [socket message]
-                                   (on-event (m/decode "application/json" message)))
-                     :on-closed  (fn [socket code reason]
-                                   (on-closed code reason))
-                     :on-failure (fn [socket exception response]
-                                   (on-error exception response))}))))))))
+(defn connect
+  "Submits the provided request for the specified operation to the server
+   as part of a websocket upgrade request. If the upgrade succeeds then
+   messages from the server will invoke the provided callbacks. Returns
+   a okhttp3.Websocket instance. Does not automatically reconnect if the
+   connection breaks. If you need reliable reconnection behaviors please
+   see the related kube-api-controllers module."
+  ([client op-selector callbacks]
+   (connect client op-selector {} callbacks))
+  ([{:keys [http-client] :as client} op-selector request callbacks]
+   (let [final-callbacks
+         (-> {:on-open    (fn default-on-open [socket response]
+                            (log/infof "Websocket connection opened with response %s." (str response)))
+              :on-bytes   (fn default-on-bytes [socket message])
+              :on-text    (fn default-on-text [socket message])
+              :on-closing (fn default-on-closing [socket code reason]
+                            (log/infof "Websocket connection is closing with code %d and reason %s." code reason))
+              :on-closed  (fn default-on-closed [socket code reason]
+                            (log/infof "Websocket connection closed with code %d and reason %s." code reason))
+              :on-failure (fn default-on-failure [socket exception response]
+                            (log/errorf exception "Connection failure with response %s." (str response)))}
+             (merge callbacks)
+             (update :on-text (fn [handler]
+                                (fn [socket message]
+                                  (handler socket
+                                           (try (m/decode "application/json" message)
+                                                (catch Exception e message)))))))
+         final-request
+         (prepare-invoke-request client op-selector request)]
+     (http/connect http-client final-request final-callbacks))))
 
 
 
@@ -243,12 +219,12 @@
 
   (def client (create-client "microk8s"))
 
-  (watch client
-         {:action "watch" :kind "Deployment"}
-         {:path-params  {:namespace "kube-system"}
-          :query-params {:watch true}}
-         {:on-event
-          (fn [message]
-            (println (get-in message [:object :metadata :labels])))})
+  (connect client
+           {:action "watch" :kind "Deployment"}
+           {:path-params  {:namespace "kube-system"}
+            :query-params {:watch true}}
+           {:on-text
+            (fn [socket message]
+              (println (get-in message [:object :metadata :labels])))})
 
   )
