@@ -46,22 +46,22 @@ Inspired by:
 (def op-selector {:kind "Deployment" :action "get"})
  
 ; tell me more about this operation
-(k8s/docs client op-selector)
+(k8s/spec client op-selector)
 
 ; what does a sample request look like?
-(k8s/gen-request client op-selector)
+(k8s/generate-request client op-selector)
 
 ; now write your actual request
 (def request {:path-params {:namespace "kube-system"}})
     
 ; now perform the request
-(def response (k8s/invoke client op-selector request))
+(def response-data (k8s/invoke client op-selector request))
 
 ; already parsed as data
-(def num-deployments-in-kube-system (count (:items response)))
+(def num-deployments-in-kube-system (count (:items response-data)))
 
 ; but what were the response headers and status?
-(select-keys (meta response) [:status :headers])
+(select-keys (:response (meta response-data)) [:status :headers])
 
 ```
 
