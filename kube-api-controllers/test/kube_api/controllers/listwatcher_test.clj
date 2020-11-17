@@ -22,7 +22,7 @@
     (observe-chan)))
 
 (defn observer []
-  (let [client      (kube/create-client "microk8s")
+  (let [client      (kube/create-client "do-nyc1-k8s-1-19-3-do-2-nyc1-1604718220356")
         op-selector {:kind "Deployment" :action "list"}
         request     {:path-params {:namespace "kube-system"}}]
     (observe client op-selector request)))

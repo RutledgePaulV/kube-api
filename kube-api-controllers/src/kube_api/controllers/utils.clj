@@ -1,18 +1,6 @@
 (ns kube-api.controllers.utils)
 
 
-(defn deleted? [[type object]]
-  (= "DELETED" type))
-
-(defn modified? [[type object]]
-  (= "MODIFIED" type))
-
-(defn added? [[type object]]
-  (= "ADDED" type))
-
-(defn sync? [[type object]]
-  (= "SYNC" type))
-
 (defn resource-version [object]
   (get-in object [:metadata :resourceVersion]))
 
@@ -36,3 +24,11 @@
            (take-while #(< % max)))
       (repeat max))
     (map (fn [x] (+ x (rand-int 1000))))))
+
+(defn dissoc-in
+  [m [k & ks]]
+  (if ks
+    (if (map? (get m k))
+      (update m k #(dissoc-in % ks))
+      m)
+    (dissoc m k)))

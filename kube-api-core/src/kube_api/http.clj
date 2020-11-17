@@ -1,7 +1,8 @@
-(ns kube-api.middleware
+(ns kube-api.http
   (:require [clojure.string :as strings]
             [muuntaja.core :as m]
-            [kube-api.utils :as utils])
+            [kube-api.utils :as utils]
+            [clj-okhttp.core :as http])
   (:import [java.io InputStream]
            [clojure.lang IObj]))
 
@@ -38,3 +39,13 @@
        (prepare-response (handler request)))
       ([request respond raise]
        (handler request (comp respond prepare-response) raise)))))
+
+
+(defn make-http-client
+  "Creates a new http client prepared to make authenticated requests to the selected cluster."
+  [context]
+  (http/create-client
+    {:server-certificates (get-in context [:cluster :certificate-authority-data])
+     :client-certificate  (get-in context [:cluster :client-certificate-data])
+     :client-key          (get-in context [:cluster :client-key-data])
+     :middleware          [wrap-prepare-response #(wrap-prepare-request % context)]}))

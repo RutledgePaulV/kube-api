@@ -2,10 +2,8 @@
   (:require [clj-okhttp.core :as http]
             [kube-api.utils :as utils]
             [kube-api.auth :as auth]
-            [kube-api.ssl :as ssl]
-            [clojure.string :as strings]
             [kube-api.swagger.kubernetes :as swag]
-            [kube-api.middleware :as mw]
+            [kube-api.http :as kube-http]
             [malli.generator :as gen]
             [muuntaja.core :as m]
             [clojure.tools.logging :as log]))
@@ -13,23 +11,6 @@
 
 (defonce validation
   (atom (delay (not (utils/in-kubernetes?)))))
-
-
-(defn- create-http-client [options]
-  (let [ca-cert            (get-in options [:cluster :certificate-authority-data])
-        client-cert        (get-in options [:cluster :client-certificate-data])
-        client-key         (get-in options [:cluster :client-key-data])
-        trust-managers     (when-not (strings/blank? ca-cert)
-                             (ssl/trust-managers ca-cert))
-        key-managers       (when-not (or (strings/blank? client-cert) (strings/blank? client-key))
-                             (ssl/key-managers client-cert client-key))
-        ssl-socket-factory (ssl/ssl-socket-factory trust-managers key-managers)
-        x509-trust-manager (utils/seek ssl/x509-trust-manager? trust-managers)
-        prepare-request-mw (fn [handler] (mw/wrap-prepare-request handler options))]
-    (http/create-client
-      {:ssl-socket-factory ssl-socket-factory
-       :x509-trust-manager x509-trust-manager
-       :middleware         [mw/wrap-prepare-response prepare-request-mw]})))
 
 
 (defn- prepare-invoke-request [client op-selector request]
@@ -65,7 +46,8 @@
   ([context]
    (if (map? context)
      (do (utils/validate! "Invalid context." auth/context-schema (dissoc context :http-client))
-         (let [{:keys [http-client] :as full-context} (update context :http-client #(or % (create-http-client context)))]
+         (let [{:keys [http-client] :as full-context}
+               (update context :http-client #(or % (kube-http/make-http-client context)))]
            (with-meta full-context
              (let [swagger    (delay (http/get http-client "/openapi/v2"))
                    operations (delay (swag/kube-swagger->operation-views (deref swagger)))]
@@ -202,9 +184,9 @@
               :on-text    (fn default-on-text [socket message]
                             (log/info "Websocket received text frame."))
               :on-closing (fn default-on-closing [socket code reason]
-                            (log/infof "Websocket connection is closing with code %d and reason %s." code reason))
+                            (log/infof "Websocket connection is closing with code '%d' and reason '%s'." code reason))
               :on-closed  (fn default-on-closed [socket code reason]
-                            (log/infof "Websocket connection closed with code %d and reason %s." code reason))
+                            (log/infof "Websocket connection closed with code '%d' and reason '%s'." code reason))
               :on-failure (fn default-on-failure [socket exception response]
                             (log/errorf exception "Connection failure with response %s." (str response)))}
              (merge callbacks)
