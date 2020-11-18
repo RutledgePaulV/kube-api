@@ -5,6 +5,10 @@
             [clojure.tools.logging :as log])
   (:import [okhttp3 Response WebSocket]))
 
+; TODO:
+; need to simulate "DELETE" events when relisting if something
+; that previously appeared in the listing or subsequent watch
+; no longer appears
 
 (defn list-watch-stream
   "Returns a core.async channel of watch events for the given resource / request.
@@ -25,7 +29,7 @@
                      respond      (fn [list-response]
                                     (loop [objects (get list-response :items [])]
                                       (if (not-empty objects)
-                                        (if (async/>!! return-chan ["ADDED" (first objects)])
+                                        (if (async/>!! return-chan {:type "ADDED" :object (first objects)})
                                           (recur (rest objects))
                                           false)
                                         (start-watching-at (utils/resource-version list-response)))))
@@ -48,12 +52,11 @@
                      (volatile! resource-version)
                      callbacks
                      {:on-text
-                      (fn [^WebSocket socket message]
-                        (let [object               (get-in message [:object])
-                              new-resource-version (utils/resource-version object)]
+                      (fn [^WebSocket socket {:keys [type object] :as message}]
+                        (let [new-resource-version (utils/resource-version object)]
                           (vreset! last-observed-version new-resource-version)
-                          (when (contains? #{"ADDED" "MODIFIED" "DELETED"} (:type message))
-                            (when-not (async/>!! return-chan [(:type message) object])
+                          (when (contains? #{"ADDED" "MODIFIED" "DELETED"} type)
+                            (when-not (async/>!! return-chan message)
                               (.close socket 1000 "Normal Closure")))))
                       :on-failure
                       (fn [socket exception ^Response response]
