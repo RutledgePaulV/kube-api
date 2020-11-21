@@ -3,17 +3,9 @@
             [malli.core :as m]
             [malli.error :as me]
             [malli.generator :as gen]
-            [clojure.pprint :as pprint]
-            [clojure.java.io :as io])
-  (:import [java.security SecureRandom]
-           [java.io ByteArrayInputStream]
-           [java.util.regex Pattern]
-           [java.util Base64]
+            [clojure.pprint :as pprint])
+  (:import [java.util.regex Pattern]
            [clojure.lang IPending]))
-
-
-(defonce random-gen
-  (SecureRandom/getInstanceStrong))
 
 
 (defn map-vals
@@ -59,37 +51,6 @@
     ([true false] [false true]) (str a b)
     [true true] (str a (subs b 1))
     [false false] (str a "/" b)))
-
-
-(defn pem-body [s]
-  (strings/join ""
-    (-> s
-        (strings/replace #".*BEGIN\s+.*" "")
-        (strings/replace #".*END\s+.*" "")
-        (strings/trim)
-        (strings/split-lines))))
-
-
-(defn random-password ^"[C" [length]
-  (let [bites (.nextBytes random-gen (byte-array (* 2 length)))
-        chars (char-array length)]
-    (doseq [[i [a b]] (map-indexed vector (partition-all 2 bites))]
-      (let [c (char (bit-or (bit-shift-left a 8) b))]
-        (aset chars i c)))
-    chars))
-
-
-(defn base64-string->bytes ^"[B" [^String s]
-  (.decode (Base64/getDecoder) s))
-
-
-(defn base64-string->stream [^String contents]
-  (ByteArrayInputStream.
-    (base64-string->bytes contents)))
-
-
-(defn pem-stream [s]
-  (base64-string->stream (pem-body s)))
 
 
 (defn render-template-string [s ctx]

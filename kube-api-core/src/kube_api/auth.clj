@@ -35,10 +35,9 @@
             namespace  (slurp namespace)
             ca-cert    (slurp ca-cert)
             endpoint   (cond-> (str "https://" service-host)
-                         (not= service-port "443") (str ":" service-port))
-            clean-cert (utils/pem-body ca-cert)]
+                         (not= service-port "443") (str ":" service-port))]
         {:user      {:token token}
-         :cluster   {:certificate-authority-data clean-cert
+         :cluster   {:certificate-authority-data ca-cert
                      :server                     endpoint}
          :namespace namespace}))))
 

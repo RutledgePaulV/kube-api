@@ -5,10 +5,6 @@
             [clojure.tools.logging :as log])
   (:import [okhttp3 Response WebSocket]))
 
-; TODO:
-; need to simulate "DELETE" events when relisting if something
-; that previously appeared in the listing or subsequent watch
-; no longer appears
 
 (defn list-watch-stream
   "Returns a core.async channel of watch events for the given resource / request.
@@ -16,7 +12,8 @@
    minutes max between attempts. If you close the returned channel then the watch
    will close itself on the next event."
   [client op-selector request]
-  (let [return-chan (async/chan)]
+  (let [return-chan (async/chan)
+        prep-object (fn [object] (update object :kind #(or % (get op-selector :kind))))]
     (letfn [(start-from-list
               ([]
                (start-from-list "0"))
@@ -27,11 +24,10 @@
                                       (assoc-in [:query-params :watch] false)
                                       (assoc-in [:query-params :resourceVersion] resource-version))
                      respond      (fn [list-response]
-                                    (loop [objects (get list-response :items [])]
-                                      (if (not-empty objects)
-                                        (if (async/>!! return-chan {:type "ADDED" :object (first objects)})
-                                          (recur (rest objects))
-                                          false)
+                                    (let [objects (mapv prep-object (get list-response :items []))]
+                                      (when (async/>!! return-chan {:type   "SYNC"
+                                                                    :kind   (get op-selector :kind)
+                                                                    :object objects})
                                         (start-watching-at (utils/resource-version list-response)))))
                      raise        (fn [exception]
                                     (log/error exception "Exception listing resources.")
@@ -56,7 +52,7 @@
                         (let [new-resource-version (utils/resource-version object)]
                           (vreset! last-observed-version new-resource-version)
                           (when (contains? #{"ADDED" "MODIFIED" "DELETED"} type)
-                            (when-not (async/>!! return-chan message)
+                            (when-not (async/>!! return-chan (assoc (update message :object prep-object) :kind (get op-selector :kind)))
                               (.close socket 1000 "Normal Closure")))))
                       :on-failure
                       (fn [socket exception ^Response response]
@@ -70,7 +66,7 @@
                               (do
                                 (Thread/sleep wait)
                                 (start-watching-at (deref last-observed-version)))
-                              (start-from-list)))))
+                              (start-from-list (deref last-observed-version))))))
                       :on-closed
                       (fn [socket code reason]
                         (log/info "Websocket connection was closed. Will attempt to reconnect where we left off.")

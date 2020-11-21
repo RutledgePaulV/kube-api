@@ -1,8 +1,14 @@
 (ns kube-api.controllers.utils)
 
 
+(defn mk-path [object]
+  [(get-in object [:kind]) (get-in object [:metadata :namespace]) (get-in object [:metadata :name])])
+
 (defn resource-version [object]
   (get-in object [:metadata :resourceVersion]))
+
+(defn index-by [f coll]
+  (into {} (map (juxt f identity)) coll))
 
 (defn parse-number [s]
   (if (number? s)
@@ -49,6 +55,15 @@
              (mapcat (fn [[x y]] (compactor x y)))
              (dedupe))))
     coll))
+
+(defn concise-resource [s]
+  (clojure.walk/postwalk
+    (fn [form]
+      (if (and (map? form) (contains? form :metadata))
+        {:metadata (select-keys (get form :metadata) [:name :namespace])}
+        form))
+    s))
+
 
 
 (defn compaction [compactor coll]

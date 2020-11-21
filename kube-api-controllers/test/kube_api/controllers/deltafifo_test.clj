@@ -1,6 +1,6 @@
-(ns kube-api.controllers.controller-test
+(ns kube-api.controllers.deltafifo-test
   (:require [clojure.test :refer :all])
-  (:require [kube-api.controllers.controller :refer :all]
+  (:require [kube-api.controllers.deltafifo :refer :all]
             [clojure.core.async :as async]))
 
 (deftest compactor-test
@@ -27,7 +27,7 @@
                      :new      {:version 2}}
           compacted (compactor [event1 event2])]
       (is (= 1 (count compacted)))
-      (is (= (assoc event1 :new (:new event2)) (first compacted))))))/
+      (is (= (assoc event1 :new (:new event2)) (first compacted)))))) /
 
 (defn resource [kind namespace name spec]
   {:kind kind :metadata {:name name :namespace namespace} :spec spec})
@@ -41,7 +41,7 @@
 (deftest controller-data-feed-test
   (let [inbound     (async/chan 100)
         feedback    (async/chan)
-        outbound    (controller-data-feed [inbound] feedback)
+        outbound    (deltafifo [inbound] feedback)
         object-1-v1 (deployment "kube-system" "core-dns" {:version 1})
         object-1-v2 (deployment "kube-system" "core-dns" {:version 2})
         object-2-v1 (deployment "istio" "citadel" {:version 1})]
