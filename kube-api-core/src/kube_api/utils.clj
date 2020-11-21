@@ -3,7 +3,8 @@
             [malli.core :as m]
             [malli.error :as me]
             [malli.generator :as gen]
-            [clojure.pprint :as pprint])
+            [clojure.pprint :as pprint]
+            [malli.util :as mu])
   (:import [java.util.regex Pattern]
            [clojure.lang IPending]))
 
@@ -15,16 +16,14 @@
       (persistent! (reduce-kv f* (transient (or (empty m) {})) m))
       (meta m))))
 
-
 (defn index-by [f coll]
   (into {} (map (juxt f identity)) coll))
 
-
 (def validator-factory
-  (memoize (fn [schema] (m/validator schema))))
+  (memoize (fn [schema] (m/validator (mu/closed-schema schema)))))
 
 (def generator-factory
-  (memoize (fn [schema] (gen/generator schema))))
+  (memoize (fn [schema] (gen/generator (mu/closed-schema schema)))))
 
 (defn in-kubernetes? []
   (not (strings/blank? (System/getenv "KUBERNETES_SERVICE_HOST"))))
@@ -79,7 +78,9 @@
 
 
 (defn validation-error [message schema data]
-  (let [error     (-> (m/explain schema data)
+  (let [error     (-> schema
+                      (mu/closed-schema)
+                      (m/explain data)
                       (me/with-spell-checking)
                       (me/humanize))
         as-string (with-out-str (pprint/pprint error))]
