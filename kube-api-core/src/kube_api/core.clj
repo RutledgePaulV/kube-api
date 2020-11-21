@@ -6,7 +6,11 @@
             [kube-api.http :as kube-http]
             [malli.generator :as gen]
             [muuntaja.core :as m]
-            [clojure.tools.logging :as log]))
+            [clojure.tools.logging :as log]
+            [kube-api.io :as io])
+  (:import [okhttp3 Response WebSocket]
+           [okio ByteString]
+           [java.io PipedInputStream PipedOutputStream OutputStream]))
 
 
 (defonce validation
@@ -173,22 +177,24 @@
    a okhttp3.Websocket instance. Does not automatically reconnect if the
    connection breaks. If you need reliable reconnection behaviors please
    see the related kube-api-controllers module."
-  ([client op-selector callbacks]
+  (^WebSocket [client op-selector callbacks]
    (connect client op-selector {} callbacks))
-  ([{:keys [http-client] :as client} op-selector request callbacks]
+  (^WebSocket [{:keys [http-client] :as client} op-selector request callbacks]
    (let [final-callbacks
-         (-> {:on-open    (fn default-on-open [socket response]
+         (-> {:on-open    (fn default-on-open [^WebSocket socket ^Response response]
                             (log/infof "Websocket connection opened with response %s." (str response)))
-              :on-bytes   (fn default-on-bytes [socket message]
+              :on-bytes   (fn default-on-bytes [^WebSocket socket ^ByteString message]
                             (log/info "Websocket received byte frame."))
-              :on-text    (fn default-on-text [socket message]
+              :on-text    (fn default-on-text [^WebSocket socket ^String message]
                             (log/info "Websocket received text frame."))
-              :on-closing (fn default-on-closing [socket code reason]
+              :on-closing (fn default-on-closing [^WebSocket socket ^Long code ^String reason]
                             (log/infof "Websocket connection is closing with code '%d' and reason '%s'." code reason))
-              :on-closed  (fn default-on-closed [socket code reason]
+              :on-closed  (fn default-on-closed [^WebSocket socket ^Long code ^String reason]
                             (log/infof "Websocket connection closed with code '%d' and reason '%s'." code reason))
-              :on-failure (fn default-on-failure [socket exception response]
-                            (log/errorf exception "Connection failure with response %s." (str response)))}
+              :on-failure (fn default-on-failure [^WebSocket socket exception ^Response response]
+                            (let [status  (.code response)
+                                  message (.string (.body response))]
+                              (log/errorf exception "Connection failure with response code '%d' and message '%s'." status message)))}
              (merge callbacks)
              (update :on-text (fn [handler]
                                 (fn [socket message]
@@ -198,9 +204,64 @@
                                                   ; unsure if k8s ever sends non-json text frames
                                                   message)))))))
          final-request
-         (prepare-invoke-request client op-selector request)]
+         (cond->
+           (prepare-invoke-request client op-selector request)
+           :always (assoc-in [:request-method] :get)
+           (= "connect" (get op-selector :action))
+           (assoc-in [:headers "Sec-WebSocket-Protocol"] "v4.channel.k8s.io"))]
      (http/connect http-client final-request final-callbacks))))
 
+
+(defn exec [client op-selector request]
+  (let [channels    (cond-> {:errors (io/piped-pair)}
+                      (true? (get-in request [:query-params :stdout]))
+                      (assoc :out (io/piped-pair))
+                      (true? (get-in request [:query-params :stderr]))
+                      (assoc :err (io/piped-pair))
+                      (true? (get-in request [:query-params :stdin]))
+                      (assoc :in (io/piped-pair)))
+        pump-holder (atom nil)
+        callbacks   {:on-open    (fn [^WebSocket socket response]
+                                   (when (contains? channels :in)
+                                     (let [in (get-in channels [:in :in])]
+                                       (reset! pump-holder (future (io/pump in (byte 0) (fn [^bytes bites] (.send socket (ByteString/of bites)))))))))
+                     :on-bytes   (fn [socket ^ByteString message]
+                                   (let [channel (.getByte message 0)
+                                         bites   (.toByteArray (.substring message 1))]
+                                     (case channel
+                                       1 (.write ^OutputStream (get-in channels [:out :out]) bites)
+                                       2 (.write ^OutputStream (get-in channels [:err :out]) bites)
+                                       ; TODO: is this really an error channel or is it just a "meta" channel?
+                                       3 (.write ^OutputStream (get-in channels [:errors :out]) bites)
+                                       (throw (ex-info "Unknown byte stream channel." {})))))
+                     :on-closing (fn [socket code reason]
+                                   (.close socket code reason))
+                     :on-closed  (fn [socket code reason]
+                                   (when-some [in ^PipedInputStream (get-in channels [:in :in])]
+                                     (.close in))
+                                   (when-some [out ^PipedOutputStream (get-in channels [:out :out])]
+                                     (.close out))
+                                   (when-some [out ^PipedOutputStream (get-in channels [:err :out])]
+                                     (.close out))
+                                   (when-some [out ^PipedOutputStream (get-in channels [:errors :out])]
+                                     (.close out))
+                                   (when-some [fut (deref pump-holder)]
+                                     (future-cancel fut)))}
+        socket      (connect client op-selector request callbacks)]
+    (cond-> {:socket socket}
+      (contains? channels :out)
+      (assoc :stdout (get-in channels [:out :in]))
+      (contains? channels :err)
+      (assoc :stderr (get-in channels [:err :in]))
+      (contains? channels :in)
+      (assoc :stdin (get-in channels [:in :out]))
+      (contains? channels :errors)
+      (assoc :errors (get-in channels [:errors :in]))
+      :always
+      (assoc :resize (fn [rows columns]
+                       ; is this just a client -> server "meta" channel?
+                       (let [msg (io/command {:Width columns :Height rows})]
+                         (.send socket msg)))))))
 
 
 (comment

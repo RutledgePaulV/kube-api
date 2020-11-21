@@ -33,7 +33,7 @@
 
 (comment
 
-  (defonce client (kube/create-client "microk8s"))
+  (defonce client (kube/create-client "do-nyc1-k8s-1-19-3-do-2-nyc1-1604718220356"))
 
   (def controller
     (kcc/start-controller client targets on-event))
