@@ -1,36 +1,45 @@
 (ns kube-api.controllers.controller-test
-  (:require [kube-api.controllers.controller :refer [start-controller]]
+  (:require [kube-api.controllers.controller :as kcc]
             [kube-api.core :as kube]
             [clojure.test :refer :all]
-            [lambdaisland.deep-diff2 :as diff]
-            [clojure.walk :as walk]))
+            [lambdaisland.deep-diff2 :as diff]))
 
 
-(defonce client (kube/create-client "do-nyc1-k8s-1-19-3-do-2-nyc1-1604718220356"))
+(require '[kube-api.controllers.controller :as kcc])
+(require '[kube-api.core :as kube])
 
-(defn slim [s]
-  (walk/postwalk
-    (fn [form]
-      (if (and (map? form) (contains? form :metadata))
-        {:metadata (select-keys (get form :metadata) [:name :namespace :labels])
-         :spec     (select-keys (get form :spec) [:replicas])
-         :kind     (get form :kind)}
-        form))
-    s))
-
-(defn dispatch [{:keys [type resource]}]
-  [(first resource) type])
+(defn dispatch [{:keys [type old new]}]
+  [type (or (get-in new [:kind]) (get-in old [:kind]))])
 
 (defmulti on-event #'dispatch)
 
-(defmethod on-event :default [{:keys [old new] :or {old {} new {}}}]
-  (locking *out* (diff/pretty-print (diff/diff (slim old) (slim new)))))
+(defmethod on-event :default [event]
+  (locking *out* (println "Ignoring:" (dispatch event))))
 
-(defn start []
-  (start-controller client [[{:kind "Pod" :action "list"}
-                             {:path-params {:namespace "kube-system"}}]] on-event))
+(defmethod on-event ["ADDED" "Pod"] [{pod :new}]
+  (locking *out* (println "Saw new pod:" (get-in pod [:metadata :name]))))
 
-(defn stop [controller]
-  (controller))
+(defmethod on-event ["MODIFIED" "Pod"] [{old-pod :old new-pod :new}]
+  (locking *out* (diff/pretty-print (diff/diff old-pod new-pod))))
 
+(defmethod on-event ["DELETED" "Deployment"] [{old-deployment :old}]
+  (locking *out* (println "Saw deployment was deleted" (get-in old-deployment [:metadata :name]))))
+
+(defonce client (kube/create-client "microk8s"))
+
+(def pod-op-selector {:kind "Pod" :action "list"})
+(def pod-request {:path-params {:namespace ""}}) ; "" is how you say 'all namespaces'
+(def pod-stream [pod-op-selector pod-request])
+
+(def deployment-op-selector {:kind "Deployment" :action "list"})
+(def deployment-request {:path-params {:namespace ""}})  ; "" is how you say 'all namespaces'
+(def deployment-stream [deployment-op-selector deployment-request])
+
+(def targets [pod-stream deployment-stream])
+
+(def controller
+  (kcc/start-controller client targets on-event))
+
+; when you're done, stop the controller by calling it
+(controller)
 
