@@ -3,8 +3,7 @@
             [kube-api.controllers.deltafifo :as df]
             [kube-api.controllers.listwatcher :as lw]
             [kube-api.controllers.utils :as utils]
-            [clojure.tools.logging :as log]
-            [kube-api.core :as kube]))
+            [clojure.tools.logging :as log]))
 
 (defn process-event-streams [streams on-event]
   (let [feedback (async/chan)
@@ -19,52 +18,30 @@
               worker-chan
               (get new-state object-id)]
           (when-not (contains? old-state object-id)
-            (async/go-loop [backoff (utils/backoff-seq 300000)]
+            (async/go-loop [[sleep :as backoff] (utils/backoff-seq 300000)]
               (when-some [event (async/<! worker-chan)]
                 (let [pending (async/thread
                                 (try (on-event event)
                                      :success
                                      (catch Exception e
-                                       (let [sleep (first backoff)]
-                                         (def EXCEPTION e)
-                                         (async/>!! feedback event)
-                                         (async/<!! (async/timeout sleep))
-                                         :timeout))))
+                                       (log/errorf e "Exception processing controller event. Backing off this resource.")
+                                       :timeout)))
                       value   (async/<! pending)]
                   (case value
                     :success
                     (recur (utils/backoff-seq 300000))
                     :timeout
-                    (recur (rest backoff)))))))
+                    (do (async/>!! feedback event)
+                        (async/<!! (async/timeout sleep))
+                        (recur (rest backoff))))))))
           (if (async/offer! worker-chan event)
             (recur)
-            (do (async/>! feedback event) (recur))))
+            (do (async/>! feedback event)
+                (async/<! (async/timeout 1000))
+                (recur))))
         (run! async/close! (vals @workers))))))
 
 (defn start-controller [client op-selectors+requests on-event]
   (let [novelty-sources (mapv #(lw/list-watch-stream client (first %) (second %)) op-selectors+requests)]
     (process-event-streams novelty-sources on-event)
     (fn [] (run! async/close! novelty-sources))))
-
-
-
-(comment
-
-  (def client (kube/create-client "do-nyc1-k8s-1-19-3-do-2-nyc1-1604718220356"))
-
-  (do
-    (defn dispatch [{:keys [type resource]}]
-      [(first resource) type])
-
-    (defmulti on-event #'dispatch)
-
-    (defmethod on-event :default [event]
-      (locking *out*
-        (clojure.pprint/pprint (utils/concise-resource event)))))
-
-  (def controller
-    (start-controller
-      client
-      [[{:kind "Deployment" :action "list"} {:path-params {:namespace "kube-system"}}]
-       [{:kind "Pod" :action "list"} {:path-params {:namespace "kube-system"}}]]
-      on-event)))
