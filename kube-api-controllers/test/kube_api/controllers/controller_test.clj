@@ -4,10 +4,6 @@
             [clojure.test :refer :all]
             [lambdaisland.deep-diff2 :as diff]))
 
-
-(require '[kube-api.controllers.controller :as kcc])
-(require '[kube-api.core :as kube])
-
 (defn dispatch [{:keys [type old new]}]
   [type (or (get-in new [:kind]) (get-in old [:kind]))])
 
@@ -25,8 +21,6 @@
 (defmethod on-event ["DELETED" "Deployment"] [{old-deployment :old}]
   (locking *out* (println "Saw deployment was deleted" (get-in old-deployment [:metadata :name]))))
 
-(defonce client (kube/create-client "microk8s"))
-
 (def pod-op-selector {:kind "Pod" :action "list"})
 (def pod-request {:path-params {:namespace ""}}) ; "" is how you say 'all namespaces'
 (def pod-stream [pod-op-selector pod-request])
@@ -37,9 +31,13 @@
 
 (def targets [pod-stream deployment-stream])
 
-(def controller
-  (kcc/start-controller client targets on-event))
+(comment
 
-; when you're done, stop the controller by calling it
-(controller)
+  (defonce client (kube/create-client "microk8s"))
+
+  (def controller
+    (kcc/start-controller client targets on-event))
+
+  ; when you're done, stop the controller by calling it
+  (controller))
 
