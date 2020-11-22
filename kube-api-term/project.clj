@@ -1,7 +1,7 @@
 (defproject org.clojars.rutledgepaulv/kube-api-term "0.1.0-SNAPSHOT"
 
   :description
-  "A Kubernetes controller library for Clojure."
+  "A library for opening emulated terminals into kubernetes pods from Clojure."
 
   :url
   "https://github.com/rutledgepaulv/kube-api"
