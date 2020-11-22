@@ -1,5 +1,6 @@
 (ns kube-api.term.core
   (:require [kube-api.core :as kube]
+            [kube-api.term.ui :as ui]
             [kube-api.io :as io])
   (:import [java.io OutputStream BufferedReader]
            [com.jediterm.terminal TtyConnector]
@@ -19,7 +20,6 @@
     (reify TtyConnector
       (init [this question]
         (let [{:keys [^WebSocket socket]} (force init)]
-          (println "Connected!")
           true))
       (resize [this term-size pixel-size]
         (let [{:keys [^WebSocket socket]} (force init)
@@ -50,16 +50,13 @@
         (let [{:keys [^WebSocket socket]} (force init)]
           (.close socket 1000 ""))))))
 
-
-(defn terminal [client namespace name]
-  (import 'kube_api.term.term)
-  (kube_api.term.term. client namespace name))
-
+(defn create-terminal [client namespace pod]
+  (ui/create-frame (fn [] (make-connector client namespace pod))))
 
 (comment
   (do
     (def client (kube/create-client "do-nyc1-k8s-1-19-3-do-2-nyc1-1604718220356"))
     (def namespace "default")
     (def name "sh")
-    (terminal client namespace name))
+    (create-terminal client namespace name))
   )

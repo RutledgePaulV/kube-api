@@ -203,6 +203,7 @@
                                                 (catch Exception e
                                                   ; unsure if k8s ever sends non-json text frames
                                                   message)))))))
+
          final-request
          (cond->
            (prepare-invoke-request client op-selector request)
@@ -212,7 +213,11 @@
      (http/connect http-client final-request final-callbacks))))
 
 
-(defn exec [client op-selector request]
+(defn exec
+  "Builds on 'connect' to implement process<>process communications using byte streams
+   multiplexed over a single websocket connection. Returns a map of input/output streams
+   that you can use to communicate with the process spawned in the pod."
+  [client op-selector request]
   (let [channels    (cond-> {:errors (io/piped-pair)}
                       (true? (get-in request [:query-params :stdout]))
                       (assoc :out (io/piped-pair))
@@ -256,12 +261,7 @@
       (contains? channels :in)
       (assoc :stdin (get-in channels [:in :out]))
       (contains? channels :errors)
-      (assoc :errors (get-in channels [:errors :in]))
-      :always
-      (assoc :resize (fn [rows columns]
-                       ; is this just a client -> server "meta" channel?
-                       (let [msg (io/command {:Width columns :Height rows})]
-                         (.send socket msg)))))))
+      (assoc :errors (get-in channels [:errors :in])))))
 
 
 (comment
@@ -275,5 +275,10 @@
            {:on-text
             (fn [socket message]
               (println (get-in message [:object :metadata :labels])))})
+
+  (def result
+    (exec client {:kind "PodExecOptions" :action "connect"}
+          {:path-params  {:namespace "default" :name "hello-world"}
+           :query-params {:command "sh" :stdout true :tty true}}))
 
   )
