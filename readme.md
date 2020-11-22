@@ -2,6 +2,8 @@
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api)
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-core.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-core)
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-controllers.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-controllers)
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-term.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-term)
+
 
 ---
 
@@ -9,7 +11,15 @@
 
 ### kube-api
 
-This is an uber module that just bundles all the modules listed below.
+This is an uber module that just bundles all the available modules.
+
+- `[org.clojars.rutledgepaulv/kube-api "0.1.0-SNAPSHOT"]`
+
+is equivalent to
+
+- `[org.clojars.rutledgepaulv/kube-api-core "0.1.0-SNAPSHOT"]`
+- `[org.clojars.rutledgepaulv/kube-api-controllers "0.1.0-SNAPSHOT"]`
+- `[org.clojars.rutledgepaulv/kube-api-term "0.1.0-SNAPSHOT"]`
 
 ---
 
@@ -118,7 +128,7 @@ Inspired by:
 
 (def targets [pod-stream deployment-stream])
 
-(def controller 
+(def controller
   (kcc/start-controller client targets on-event))
 
 ; when you're done, stop the controller by calling it
