@@ -1,5 +1,12 @@
 [![Build Status](https://travis-ci.com/rutledgepaulv/kube-api.svg?branch=master)](https://travis-ci.com/rutledgepaulv/kube-api)
 
+## What
+
+A set of Clojure libraries for interacting with Kubernetes from a Clojure program or repl. Seeks to be comprehensive and
+self discoverable. `kube-api-core` is the base module for interacting with the Kubernetes API Server and the other modules
+build some higher level constructs out of those primitives (usually with additional dependencies).
+
+
 ## Modules
 
 ### kube-api
@@ -87,7 +94,6 @@ interact with a shell in the remote pod without leaving the JVM process.
 (ktc/terminal client namespace pod) ; this line pops open a swing frame with an attached shell
 
 ```
-
 
 ---
 
