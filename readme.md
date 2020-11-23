@@ -24,7 +24,7 @@ This module bundles all modules (described below) for ease of use.
 
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-core.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-core)
 
-[View code examples](./kube-api-core/readme.md)
+[View code examples](./kube-api-core)
 
 This implements the basic REST / websocket client code to communicate with the Kubernetes API. It defines the available
 operations using the swagger specification served from the remote Kubernetes cluster. You can use this to CRUD on
@@ -44,7 +44,7 @@ Leverages:
 
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-term.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-term)
 
-[View code examples](./kube-api-term/readme.md)
+[View code examples](./kube-api-term)
 
 This adapts the byte streams of a Kubernetes "exec" call into a terminal emulator so you can display an interactive
 shell into the selected Kubernetes pod.
@@ -57,7 +57,7 @@ Leverages:
 
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-controllers.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-controllers)
 
-[View code examples](./kube-api-controllers/readme.md)
+[View code examples](./kube-api-controllers)
 
 This satisfies the same goals as the tools/cache package from the standard go client. Provides machinery for writing
 controllers (aka operators) that manages threads, watches, retries, and state for you so that your user space controller
