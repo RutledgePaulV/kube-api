@@ -2,161 +2,76 @@
 
 ## What
 
-A set of Clojure libraries for interacting with Kubernetes from a Clojure program or repl. Seeks to be comprehensive and
-self discoverable. `kube-api-core` is the base module for interacting with the Kubernetes API Server and the other modules
-build some higher level constructs out of those primitives (usually with additional dependencies).
+A set of Clojure libraries for interacting with Kubernetes from a Clojure application / repl. 
+Composed of a core kubernetes client + some higher level constructs built on top of the client
+(usually with some added dependencies). 
+
+## Why
+
+Some Clojure Kubernetes libraries already exist, but they're not very comprehensive. I want
+something robust enough that I can write production cluster operators in Clojure.
+
+> If you want things, make them. - Rich Hickey
 
 
 ## Modules
 
-### kube-api
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api)
 
-This is a module that just bundles all the other modules for ease when you expect to use all pieces.
-
-- [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api)
-
-is equivalent to
-
-- [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-core.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-core)
-- [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-term.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-term)
-- [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-controllers.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-controllers)
+This module bundles all modules (described below) for ease of use.
 
 ---
 
-### kube-api-core
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-core.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-core)
 
-A comprehensive, idiomatic, and data driven Kubernetes client for Clojure. The available operations are dynamically
-constructed from the swagger definition hosted by the Kubernetes cluster you target so it should always be version
-compatible.
+[View code examples](./kube-api-core/readme.md)
+
+This implements the basic REST / websocket client code to communicate with the Kubernetes API. It defines the available
+operations using the swagger specification served from the remote Kubernetes cluster. You can use this to CRUD on
+Kubernetes resources and to just explore the available operations.
 
 Inspired by:
 
 - [Cognitect's aws-api library](https://github.com/cognitect-labs/aws-api)
 - [Nubank's k8s-api library](https://github.com/nubank/k8s-api)
-- [Malli](https://github.com/metosin/malli)
 
-#### Usage
+Leverages:
 
-```clojure 
-
-(require '[kube-api.core :as k8s])
-
-; what cluster do you want to target for local dev?
-(def context-name "microk8s")
-
-; this will use your ~/.kube/config file by default,
-; or if this code was running inside a pod, it would 
-; use the service account auth
-(def client (k8s/create-client context-name))
-
-; what ops are available?
-(k8s/ops client)
-
-; okay, I want to get deployments (optionally include :version and :group)
-(def op-selector {:kind "Deployment" :action "get"})
- 
-; tell me more about this operation
-(k8s/spec client op-selector)
-
-; what does a sample request look like?
-(k8s/generate-request client op-selector)
-
-; now write your actual request
-(def request {:path-params {:namespace "kube-system"}})
-    
-; now perform the request
-(def response-data (k8s/invoke client op-selector request))
-
-; already parsed as data
-(def num-deployments-in-kube-system (count (:items response-data)))
-
-; but what were the response headers and status?
-(select-keys (:response (meta response-data)) [:status :headers])
-
-```
+- [malli](https://github.com/metosin/malli)
+- [clj-okhttp](https://github.com/rutledgepaulv/clj-okhttp)
 
 ---
 
-### kube-api-term
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-term.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-term)
 
-Connects a pod exec session with a [Jediterm](https://github.com/JetBrains/jediterm) terminal emulator so you can
-interact with a shell in the remote pod without leaving the JVM process.
+[View code examples](./kube-api-term/readme.md)
 
-```clojure 
+This adapts the byte streams of a Kubernetes "exec" call into a terminal emulator so you can display an interactive
+shell into the selected Kubernetes pod.
 
-(require '[kube-api.term.core :as ktc])
-(require '[kube-api.core :as kube])
+Leverages:
 
-(defonce client (kube/create-client "microk8s"))
-
-(def namespace "default")
-(def pod "hello-world-234243-asf32")
-(ktc/terminal client namespace pod) ; this line pops open a swing frame with an attached shell
-
-```
+- [jediterm](https://github.com/JetBrains/jediterm)
 
 ---
 
-### kube-api-controllers
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-controllers.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-controllers)
 
-Satisfies the same goals as the tools/cache package from the standard go client. Provides machinery for writing
-controllers (aka operators) that manages threads, watches, and state for you so that a user space controller
-implementation doesn't have to worry about all those gruesome details.
+[View code examples](./kube-api-controllers/readme.md)
+
+This satisfies the same goals as the tools/cache package from the standard go client. Provides machinery for writing
+controllers (aka operators) that manages threads, watches, retries, and state for you so that your user space controller
+implementation doesn't have to worry about so many details.
 
 Inspired by:
 
-- [This awesome 11 part series by Laird Nelson](https://lairdnelson.wordpress.com/2018/01/07/understanding-kubernetes-tools-cache-package-part-0/)
+- [This awesome 11 part series on tools/cache by Laird Nelson](https://lairdnelson.wordpress.com/2018/01/07/understanding-kubernetes-tools-cache-package-part-0/)
 
-#### Usage
+Leverages:
 
-```clojure
+- [core.async](https://github.com/clojure/core.async)
 
-(require '[kube-api.controllers.controller :as kcc])
-(require '[kube-api.core :as kube])
-
-(defonce client (kube/create-client "microk8s"))
-
-(defn dispatch [{:keys [type old new]}]
-  [type (or (get-in new [:kind]) (get-in old [:kind]))])
-
-(defmulti on-event #'dispatch)
-
-(defmethod on-event :default [{:keys [state] :as event}]
-  (locking *out*
-    (println "Ignoring:" (dispatch event))
-    ; note that every event also receives a state map that contains the most recent resource
-    ; of everything being observed on any of your controller's event streams
-    (println "Number of pods in kube-system:" (count (vals (get-in state ["Pod" "kube-system"]))))
-    (println "Number of deployments in kube-system:" (count (vals (get-in state ["Deployment" "kube-system"]))))))
-
-(defmethod on-event ["ADDED" "Pod"] [{pod :new}]
-  (locking *out* (println "Saw new pod:" (get-in pod [:metadata :name]))))
-
-(defmethod on-event ["MODIFIED" "Pod"] [{old-pod :old new-pod :new}]
-  (locking *out* (diff/pretty-print (diff/diff old-pod new-pod))))
-
-(defmethod on-event ["DELETED" "Deployment"] [{old-deployment :old}]
-  (locking *out* (println "Saw deployment was deleted" (get-in old-deployment [:metadata :name]))))
-
-(def pod-op-selector {:kind "Pod" :action "list"})
-(def pod-request {:path-params {:namespace ""}}) ; "" is how you say 'all namespaces'
-(def pod-stream [pod-op-selector pod-request])
-
-(def deployment-op-selector {:kind "Deployment" :action "list"})
-(def deployment-request {:path-params {:namespace ""}})  ; "" is how you say 'all namespaces'
-(def deployment-stream [deployment-op-selector deployment-request])
-
-(def targets [pod-stream deployment-stream])
-
-(def controller
-  (kcc/start-controller client targets on-event))
-
-; when you're done, stop the controller by calling it
-(controller)
-
-```
-
----
+--- 
 
 ## License
 
