@@ -1,29 +1,18 @@
 [![Build Status](https://travis-ci.com/rutledgepaulv/kube-api.svg?branch=master)](https://travis-ci.com/rutledgepaulv/kube-api)
 
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api)
-
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-core.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-core)
-
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-controllers.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-controllers)
-
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-term.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-term)
-
-
----
-
 ## Modules
 
 ### kube-api
 
-This is an uber module that just bundles all the available modules.
+This is a module that just bundles all the other modules for ease when you expect to use all pieces.
 
-- `[org.clojars.rutledgepaulv/kube-api "0.1.0-SNAPSHOT"]`
+- [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api)
 
 is equivalent to
 
-- `[org.clojars.rutledgepaulv/kube-api-core "0.1.0-SNAPSHOT"]`
-- `[org.clojars.rutledgepaulv/kube-api-controllers "0.1.0-SNAPSHOT"]`
-- `[org.clojars.rutledgepaulv/kube-api-term "0.1.0-SNAPSHOT"]`
+- [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-core.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-core)
+- [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-term.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-term)
+- [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-controllers.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-controllers)
 
 ---
 
@@ -78,6 +67,27 @@ Inspired by:
 (select-keys (:response (meta response-data)) [:status :headers])
 
 ```
+
+---
+
+### kube-api-term
+
+Connects a pod exec session with a [Jediterm](https://github.com/JetBrains/jediterm) terminal emulator so you can
+interact with a shell in the remote pod without leaving the JVM process.
+
+```clojure 
+
+(require '[kube-api.term.core :as ktc])
+(require '[kube-api.core :as kube])
+
+(defonce client (kube/create-client "microk8s"))
+
+(def namespace "default")
+(def pod "hello-world-234243-asf32")
+(ktc/terminal client namespace pod) ; this line pops open a swing frame with an attached shell
+
+```
+
 
 ---
 
