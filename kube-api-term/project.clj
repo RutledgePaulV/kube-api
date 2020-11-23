@@ -27,9 +27,6 @@
   [["releases" :clojars]
    ["snapshots" :clojars]]
 
-  :aot
-  [kube-api.term.term]
-
   :dependencies
   [[org.clojure/clojure "1.10.1"]
    [org.clojars.rutledgepaulv/kube-api-core "0.1.0-SNAPSHOT"]
