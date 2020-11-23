@@ -9,9 +9,10 @@ Composed of a core kubernetes client + some higher level constructs built on top
 ## Why
 
 Some Clojure Kubernetes libraries already exist, but they're not very comprehensive. I want
-something robust enough that I can write production cluster operators in Clojure.
-
-> If you want things, make them. - Rich Hickey
+something robust enough that I can write production cluster operators in Clojure. The fabric8
+client for java is robust and comprehensive but it's somewhat painful to use from Clojure and
+any attempts to layer over it would likely result in something similar to amazonica, and anyone 
+who has used cognitect's aws-api knows how much nicer it is to have a data driven API.
 
 
 ## Modules
