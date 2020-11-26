@@ -8,19 +8,26 @@
   (let [in (PipedInputStream.)]
     {:in in :out (PipedOutputStream. in)}))
 
-(defn pump [^InputStream stream flag f]
-  (loop [buffer (byte-array 1024)]
-    (when-not (.isInterrupted (Thread/currentThread))
-      (when-some [length (.read stream buffer)]
-        (when-not (neg? length)
-          (let [immutable (byte-array (inc length))]
-            (aset immutable 0 (byte flag))
-            (System/arraycopy buffer 0 immutable 1 length)
-            (f immutable))
-          (if (pos? (.available stream))
-            (recur buffer)
-            (do (Thread/sleep 50)
-                (recur buffer))))))))
+(defn pump
+  ([^InputStream stream f]
+   (pump stream nil f))
+  ([^InputStream stream flag f]
+   (loop [buffer (byte-array 1024)]
+     (when-not (.isInterrupted (Thread/currentThread))
+       (when-some [length (.read stream buffer)]
+         (when-not (neg? length)
+           (if (some? flag)
+             (let [immutable (byte-array (inc length))]
+               (aset immutable 0 (byte flag))
+               (System/arraycopy buffer 0 immutable 1 length)
+               (f immutable))
+             (let [immutable (byte-array length)]
+               (System/arraycopy buffer 0 immutable 0 length)
+               (f immutable)))
+           (if (pos? (.available stream))
+             (recur buffer)
+             (do (Thread/sleep 50)
+                 (recur buffer)))))))))
 
 (defn command ^ByteString [message]
   (let [encoded (slurp (muuntaja/encode "application/json" message))

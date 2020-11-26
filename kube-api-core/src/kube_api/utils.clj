@@ -4,7 +4,8 @@
             [malli.error :as me]
             [malli.generator :as gen]
             [clojure.pprint :as pprint]
-            [malli.util :as mu])
+            [malli.util :as mu]
+            [malli.transform :as mt])
   (:import [java.util.regex Pattern]
            [clojure.lang IPending]))
 
@@ -86,6 +87,13 @@
         as-string (with-out-str (pprint/pprint error))]
     (throw (ex-info (str message \newline as-string) {:error error}))))
 
+
+(def default-transformer
+  (mt/default-value-transformer
+    {:defaults {:map (constantly {})}}))
+
+(defn prepare [schema data]
+  (m/decode schema data default-transformer))
 
 (defn validate! [message schema data]
   (let [validator (validator-factory schema)]

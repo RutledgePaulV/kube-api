@@ -8,9 +8,9 @@
             [muuntaja.core :as m]
             [clojure.tools.logging :as log]
             [kube-api.io :as io])
-  (:import [okhttp3 Response WebSocket]
+  (:import [okhttp3 Response WebSocket Call]
            [okio ByteString]
-           [java.io PipedInputStream PipedOutputStream OutputStream]))
+           [java.io OutputStream Closeable InputStream FilterInputStream]))
 
 
 (defonce validation
@@ -18,17 +18,19 @@
 
 
 (defn- prepare-invoke-request [client op-selector request]
-  (let [validate? (force (deref validation))
+  (let [validate?             (force (deref validation))
         {:keys [op-selector-schema] :as views} (-> client (meta) :operations (force))
-        _         (when validate? (utils/validate! "Invalid op selector." op-selector-schema op-selector))
-        {:keys [uri request-method request-schema]} (swag/get-op views op-selector)
-        _         (when validate? (utils/validate! "Invalid request." request-schema request))]
-    (let [rendered-uri (utils/render-template-string uri (get-in request [:path-params]))]
+        defaulted-op-selector (utils/prepare op-selector-schema op-selector)
+        _                     (when validate? (utils/validate! "Invalid op selector." op-selector-schema defaulted-op-selector))
+        {:keys [uri request-method request-schema]} (swag/get-op views defaulted-op-selector)
+        defaulted-request     (utils/prepare request-schema request)
+        _                     (when validate? (utils/validate! "Invalid request." request-schema defaulted-request))]
+    (let [rendered-uri (utils/render-template-string uri (get-in defaulted-request [:path-params]))]
       (cond-> {:request-method request-method :url rendered-uri}
-        (not-empty (:query-params request))
-        (assoc :query-params (:query-params request))
-        (not-empty (:body-params request))
-        (assoc :form-params (:body-params request))))))
+        (not-empty (:query-params defaulted-request))
+        (assoc :query-params (:query-params defaulted-request))
+        (not-empty (:body-params defaulted-request))
+        (assoc :form-params (:body-params defaulted-request))))))
 
 
 (defn set-validation!
@@ -74,8 +76,8 @@
 
    "
   ([client]
-   (->> (keys (:operations (-> client (meta) :operations (force))))
-        (sort-by (juxt :kind :group :version :action))))
+   (->> (:selectors (-> client (meta) :operations (force)) [])
+        (sort-by (juxt :kind :group :version :action :operation))))
   ([client op-filter]
    (filter #(= (select-keys % (keys op-filter)) op-filter) (ops client))))
 
@@ -110,8 +112,9 @@
 
    "
   [client op-selector request]
-  (let [{:keys [request-schema]} (spec client op-selector)]
-    (utils/validate! "Invalid request." request-schema request)))
+  (let [{:keys [request-schema]} (spec client op-selector)
+        defaulted-request (utils/prepare request-schema request)]
+    (utils/validate! "Invalid request." request-schema defaulted-request)))
 
 
 (defn generate-request
@@ -209,8 +212,10 @@
            (prepare-invoke-request client op-selector request)
            :always (assoc-in [:request-method] :get)
            (= "connect" (get op-selector :action))
-           (assoc-in [:headers "Sec-WebSocket-Protocol"] "v4.channel.k8s.io"))]
-     (http/connect http-client final-request final-callbacks))))
+           (assoc-in [:headers "Sec-WebSocket-Protocol"] "v4.channel.k8s.io"))
+         clone-client
+         (kube-http/without-read-timeout http-client)]
+     (http/connect clone-client final-request final-callbacks))))
 
 
 (defn exec
@@ -218,7 +223,7 @@
    multiplexed over a single websocket connection. Returns a map of input/output streams
    that you can use to communicate with the process spawned in the pod."
   [client op-selector request]
-  (let [channels    (cond-> {:errors (io/piped-pair)}
+  (let [channels    (cond-> {:meta (io/piped-pair)}
                       (true? (get-in request [:query-params :stdout]))
                       (assoc :out (io/piped-pair))
                       (true? (get-in request [:query-params :stderr]))
@@ -236,20 +241,17 @@
                                      (case channel
                                        1 (.write ^OutputStream (get-in channels [:out :out]) bites)
                                        2 (.write ^OutputStream (get-in channels [:err :out]) bites)
-                                       ; TODO: is this really an error channel or is it just a "meta" channel?
-                                       3 (.write ^OutputStream (get-in channels [:errors :out]) bites)
+                                       3 (.write ^OutputStream (get-in channels [:meta :out]) bites)
                                        (throw (ex-info "Unknown byte stream channel." {})))))
                      :on-closing (fn [socket code reason]
                                    (.close socket code reason))
                      :on-closed  (fn [socket code reason]
-                                   (when-some [in ^PipedInputStream (get-in channels [:in :in])]
-                                     (.close in))
-                                   (when-some [out ^PipedOutputStream (get-in channels [:out :out])]
-                                     (.close out))
-                                   (when-some [out ^PipedOutputStream (get-in channels [:err :out])]
-                                     (.close out))
-                                   (when-some [out ^PipedOutputStream (get-in channels [:errors :out])]
-                                     (.close out))
+                                   (doseq [^Closeable close
+                                           (filter some? [(get-in channels [:in :in])
+                                                          (get-in channels [:out :out])
+                                                          (get-in channels [:err :out])
+                                                          (get-in channels [:meta :out])])]
+                                     (.close close))
                                    (when-some [fut (deref pump-holder)]
                                      (future-cancel fut)))}
         socket      (connect client op-selector request callbacks)]
@@ -261,7 +263,40 @@
       (contains? channels :in)
       (assoc :stdin (get-in channels [:in :out]))
       (contains? channels :errors)
-      (assoc :errors (get-in channels [:errors :in])))))
+      (assoc :meta (get-in channels [:meta :in])))))
+
+
+#_(defn logs
+    "Returns an input stream that will load stream the logs for the selected pod.
+     Typically you will want to wrap the stream with a BufferedReader to consume
+     it one line of logs at a time."
+    ([{:keys [http-client] :as client} op-selector request]
+     (let [final-http-client
+           (kube-http/without-read-timeout http-client)
+           final-request
+           (-> (prepare-invoke-request client op-selector request)
+               (assoc :as :stream)
+               (assoc-in [:query-params :follow] true))
+           {:keys [^InputStream in ^OutputStream out]}
+           (io/piped-pair)
+           call
+           ^Call (http/request*
+                   final-http-client
+                   final-request
+                   (fn [response]
+                     (let [stream (get response :body)]
+                       (with-open [in stream]
+                         (io/pump in
+                                  (fn [^bytes bites]
+                                    (.write out bites))))))
+                   (fn [exception]
+                     (log/error exception "Received error response when opening log stream.")
+                     (.close out)
+                     (.close in)))]
+       (proxy [FilterInputStream] [in]
+         (close []
+           (.close out)
+           (.cancel call))))))
 
 
 (comment

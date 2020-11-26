@@ -13,18 +13,6 @@
 (defmethod compact-events :default [prev next]
   [prev next])
 
-(defmethod compact-events ["SYNC" "SYNC"] [prev next]
-  [next])
-
-(defmethod compact-events ["ADDED" "SYNC"] [prev next]
-  [next])
-
-(defmethod compact-events ["MODIFIED" "SYNC"] [prev next]
-  [next])
-
-(defmethod compact-events ["DELETED" "SYNC"] [prev next]
-  [next])
-
 (defmethod compact-events ["ADDED" "MODIFIED"] [prev next]
   [(merge prev (select-keys next [:new :index]))])
 

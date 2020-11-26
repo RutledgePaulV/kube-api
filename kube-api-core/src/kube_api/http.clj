@@ -4,7 +4,9 @@
             [kube-api.utils :as utils]
             [clj-okhttp.core :as http])
   (:import [java.io InputStream]
-           [clojure.lang IObj]))
+           [clojure.lang IObj]
+           [okhttp3 OkHttpClient$Builder OkHttpClient]
+           [java.util.concurrent TimeUnit]))
 
 
 (defn wrap-prepare-request [handler auth-config]
@@ -36,9 +38,17 @@
                 response)))]
     (fn prepare-response-handler
       ([request]
-       (prepare-response (handler request)))
+       (cond-> (handler request)
+         (not= :stream (:as request))
+         (prepare-response)))
       ([request respond raise]
-       (handler request (comp respond prepare-response) raise)))))
+       (handler request
+                (fn [response]
+                  (respond
+                    (cond-> response
+                      (not= :stream (:as request))
+                      (prepare-response))))
+                raise)))))
 
 
 (defn make-http-client
@@ -49,3 +59,7 @@
      :client-certificate  (get-in context [:cluster :client-certificate-data])
      :client-key          (get-in context [:cluster :client-key-data])
      :middleware          [wrap-prepare-response #(wrap-prepare-request % context)]}))
+
+
+(defn without-read-timeout [^OkHttpClient client]
+  (http/create-client client {:read-timeout 0}))

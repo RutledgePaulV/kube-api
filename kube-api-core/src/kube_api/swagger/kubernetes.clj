@@ -5,7 +5,9 @@
             [kube-api.utils :as utils]
             [clojure.set :as sets]
             [clojure.java.io :as io]
-            [clojure.edn :as edn]))
+            [clojure.edn :as edn]
+            [clojure.string :as strings]
+            [lambdaisland.deep-diff2 :as diff]))
 
 
 ; kubernetes specific extensions because these swagger specs are insufficiently
@@ -62,6 +64,9 @@
 (defn kubernetes-kind [op]
   (:kind (kubernetes-group-version-kind op)))
 
+(defn kubernetes-operation [op]
+  (:operationId op))
+
 (defn well-formed? [op]
   (and (not-empty (kubernetes-group-version-kind op))
        (not-empty (kubernetes-action op))))
@@ -93,12 +98,25 @@
   (delay (edn/read-string (slurp (io/resource "kube_api/swagger-overlay.edn")))))
 
 
-(defn op-selector-schema [{:keys [by-group by-version by-kind by-action] :as views}]
+(defn op-selector-schema [{:keys [by-operation by-group by-version by-kind by-action] :as views}]
   [:map {:closed true}
-   [:group {:optional true} (into [:enum] (sort (keys by-group)))]
-   [:version {:optional true} (into [:enum] (sort (keys by-version)))]
-   [:kind (into [:enum] (sort (keys by-kind)))]
-   [:action (into [:enum] (sort (keys by-action)))]])
+   [:operation {:optional true}
+    (into [:enum] (sort (keys by-operation)))]
+   [:group {:optional true}
+    (into [:enum] (sort (keys by-group)))]
+   [:version {:optional true}
+    (into [:enum] (sort (keys by-version)))]
+   [:kind {:optional true}
+    (into [:enum] (sort (keys by-kind)))]
+   [:action {:optional true}
+    (into [:enum] (sort (keys by-action)))]])
+
+(defn index [operations]
+  {:by-operation (group-by kubernetes-operation operations)
+   :by-group     (group-by kubernetes-group operations)
+   :by-version   (group-by kubernetes-version operations)
+   :by-kind      (group-by kubernetes-kind operations)
+   :by-action    (group-by kubernetes-action operations)})
 
 (defn kube-swagger->operation-views
   "Converts the swagger-spec into a set of operations and creates a few lookup
@@ -109,47 +127,48 @@
         operations    (->> (swagger/swagger->ops modified-spec)
                            (filter well-formed?)
                            (map normalize))
-        by-selector   (utils/index-by
+        selectors     (map
                         (fn [op]
                           (array-map
                             :kind (kubernetes-kind op)
+                            :operation (kubernetes-operation op)
                             :action (kubernetes-action op)
                             :version (kubernetes-version op)
                             :group (kubernetes-group op)))
                         operations)
-        by-group      (group-by kubernetes-group operations)
-        by-version    (group-by kubernetes-version operations)
-        by-kind       (group-by kubernetes-kind operations)
-        by-action     (group-by kubernetes-action operations)
-        views         {:operations by-selector
-                       :by-group   by-group
-                       :by-version by-version
-                       :by-kind    by-kind
-                       :by-action  by-action}
+        views         (assoc (index operations) :selectors selectors)
         schema        (op-selector-schema views)]
     (assoc views :op-selector-schema schema)))
 
 
-(defn get-op [{:keys [by-group by-version by-kind by-action] :as views}
-              {:keys [group kind version action] :as op-selector}]
-  (let [sets         (cond-> #{}
-                       (some? group)
-                       (conj (set (get by-group (name group) #{})))
-                       (some? kind)
-                       (conj (set (get by-kind (name kind) #{})))
-                       (some? version)
-                       (conj (set (get by-version (name version) #{})))
-                       (some? action)
-                       (conj (set (get by-action (name action) #{}))))
-        remainder    (apply sets/intersection sets)
-        r-by-group   (group-by kubernetes-group remainder)
-        r-by-version (group-by kubernetes-version remainder)
-        r-by-action  (group-by kubernetes-action remainder)
-        best-group   (or (some-> group name) (most-appropriate-group (keys r-by-group)))
-        best-version (or (some-> version name) (most-appropriate-default-version (keys r-by-version)))
-        best-action  (or (some-> action name) "list")
-        remainder'   (sets/intersection
-                       (set (get r-by-group best-group #{}))
-                       (set (get r-by-version best-version #{}))
-                       (set (get r-by-action best-action #{})))]
-    (first remainder')))
+(defn select [indexes selector]
+  (reduce
+    (fn [result [k v]]
+      (let [selector-name (keyword (strings/replace-first (name k) "by-" ""))]
+        (if-some [selector-value (get selector selector-name)]
+          (if (nil? result)
+            (set (get v (name selector-value) #{}))
+            (sets/intersection result (set (get v (name selector-value) #{}))))
+          result)))
+    nil
+    indexes))
+
+(defn get-op [views selector]
+  (let [; perform one select to narrow the available options
+        remainder  (select views selector)
+        ; index the narrowed results
+        views'     (index remainder)
+        ; refine the selector by picking the best group/version of the remainder
+        ; if group and version were unset
+        selector'  (-> selector
+                       (update :group #(or % (most-appropriate-group (keys (:by-group views')))))
+                       (update :version #(or % (most-appropriate-default-version (keys (:by-version views'))))))
+        ; perform another selection
+        remainder' (select views' selector')]
+    (cond
+      (empty? remainder')
+      (throw (ex-info "op-selector didn't match an available operation" {}))
+      (< 1 (count remainder'))
+      (throw (ex-info "op-selector not specific enough to identify operation" {}))
+      :otherwise
+      (first remainder'))))
