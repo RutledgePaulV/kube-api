@@ -1,6 +1,6 @@
 (ns kube-api.io
   (:require [muuntaja.core :as muuntaja])
-  (:import [java.io PipedOutputStream PipedInputStream InputStream]
+  (:import [java.io PipedOutputStream PipedInputStream InputStream IOException]
            [okio ByteString]
            [java.nio.charset Charset]))
 
@@ -8,22 +8,31 @@
   (let [in (PipedInputStream.)]
     {:in in :out (PipedOutputStream. in)}))
 
-(defn pump
+(defn copy-to-channel ^bytes [^long channel ^bytes bites]
+  (let [it (byte-array (inc (alength bites)))]
+    (aset it 0 (byte channel))
+    (System/arraycopy bites 0 it 1 (alength bites))
+    it))
+
+(defn pumper
   ([^InputStream stream f]
-   (pump stream nil f))
+   (pumper stream nil f))
   ([^InputStream stream flag f]
    (loop [buffer (byte-array 1024)]
      (when-not (.isInterrupted (Thread/currentThread))
-       (when-some [length (.read stream buffer)]
+       (when-some [length (try
+                            (.read stream buffer)
+                            (catch IOException e
+                              nil))]
          (when-not (neg? length)
            (if (some? flag)
-             (let [immutable (byte-array (inc length))]
-               (aset immutable 0 (byte flag))
-               (System/arraycopy buffer 0 immutable 1 length)
-               (f immutable))
-             (let [immutable (byte-array length)]
-               (System/arraycopy buffer 0 immutable 0 length)
-               (f immutable)))
+             (let [it (byte-array (inc length))]
+               (aset it 0 (byte flag))
+               (System/arraycopy buffer 0 it 1 length)
+               it)
+             (let [it (byte-array length)]
+               (System/arraycopy buffer 0 it 0 length)
+               (f it)))
            (if (pos? (.available stream))
              (recur buffer)
              (do (Thread/sleep 50)
@@ -31,9 +40,5 @@
 
 (defn command ^ByteString [message]
   (let [encoded (slurp (muuntaja/encode "application/json" message))
-        bites   (.getBytes encoded (Charset/forName "UTF-8"))
-        frame   (byte-array (inc (alength bites)))]
-    ; channel 4 is the command channel
-    (aset frame 0 (byte 4))
-    (System/arraycopy bites 0 frame 1 (alength bites))
-    (ByteString/of bites)))
+        bites   (.getBytes encoded (Charset/forName "UTF-8"))]
+    (ByteString/of (copy-to-channel 4 bites))))

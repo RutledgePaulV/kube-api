@@ -10,7 +10,7 @@
             [kube-api.io :as io])
   (:import [okhttp3 Response WebSocket Call]
            [okio ByteString]
-           [java.io OutputStream Closeable InputStream FilterInputStream]))
+           [java.io OutputStream Closeable InputStream FilterInputStream IOException Reader InputStreamReader]))
 
 
 (defonce validation
@@ -230,11 +230,11 @@
                       (assoc :err (io/piped-pair))
                       (true? (get-in request [:query-params :stdin]))
                       (assoc :in (io/piped-pair)))
-        pump-holder (atom nil)
+        pump-holder (promise)
         callbacks   {:on-open    (fn [^WebSocket socket response]
                                    (when (contains? channels :in)
                                      (let [in (get-in channels [:in :in])]
-                                       (reset! pump-holder (future (io/pump in (byte 0) (fn [^bytes bites] (.send socket (ByteString/of bites)))))))))
+                                       (deliver pump-holder (future (io/pumper in (byte 0) (fn [^bytes bites] (.send socket (ByteString/of bites)))))))))
                      :on-bytes   (fn [socket ^ByteString message]
                                    (let [channel (.getByte message 0)
                                          bites   (.toByteArray (.substring message 1))]
@@ -252,8 +252,9 @@
                                                           (get-in channels [:err :out])
                                                           (get-in channels [:meta :out])])]
                                      (.close close))
-                                   (when-some [fut (deref pump-holder)]
-                                     (future-cancel fut)))}
+                                   (when (realized? pump-holder)
+                                     (when-some [fut (deref pump-holder)]
+                                       (future-cancel fut))))}
         socket      (connect client op-selector request callbacks)]
     (cond-> {:socket socket}
       (contains? channels :out)
@@ -266,37 +267,42 @@
       (assoc :meta (get-in channels [:meta :in])))))
 
 
-#_(defn logs
-    "Returns an input stream that will load stream the logs for the selected pod.
-     Typically you will want to wrap the stream with a BufferedReader to consume
-     it one line of logs at a time."
-    ([{:keys [http-client] :as client} op-selector request]
-     (let [final-http-client
-           (kube-http/without-read-timeout http-client)
-           final-request
-           (-> (prepare-invoke-request client op-selector request)
-               (assoc :as :stream)
-               (assoc-in [:query-params :follow] true))
-           {:keys [^InputStream in ^OutputStream out]}
-           (io/piped-pair)
-           call
-           ^Call (http/request*
-                   final-http-client
-                   final-request
-                   (fn [response]
-                     (let [stream (get response :body)]
-                       (with-open [in stream]
-                         (io/pump in
-                                  (fn [^bytes bites]
-                                    (.write out bites))))))
-                   (fn [exception]
-                     (log/error exception "Received error response when opening log stream.")
-                     (.close out)
-                     (.close in)))]
-       (proxy [FilterInputStream] [in]
-         (close []
-           (.close out)
-           (.cancel call))))))
+(defn logs
+  "Returns an input stream that will load stream the logs for the selected pod.
+   Typically you will want to wrap the stream with a BufferedReader to consume
+   it one line of logs at a time."
+  ([{:keys [http-client] :as client} op-selector request]
+   (let [final-http-client
+         (kube-http/without-read-timeout http-client)
+         final-request
+         (-> (prepare-invoke-request client op-selector request)
+             (assoc :as :stream)
+             (assoc-in [:query-params :follow] true))
+         {:keys [^InputStream in ^OutputStream out]}
+         (io/piped-pair)
+         pumper
+         (promise)
+         call
+         ^Call (http/request*
+                 final-http-client
+                 final-request
+                 (fn [response]
+                   (deliver pumper (Thread/currentThread))
+                   (with-open [in (get response :body)]
+                     (io/pumper in #(.write out ^bytes %))))
+                 (fn [exception]
+                   (log/error exception "Received error response when opening log stream.")
+                   (.close in)
+                   (.close out)))]
+     (proxy [FilterInputStream] [in]
+       (close []
+         (when (realized? pumper)
+           (.interrupt (deref pumper)))
+         (.close in)
+         (.close out)
+         (.cancel call))))))
+
+
 
 
 (comment
@@ -315,5 +321,19 @@
     (exec client {:kind "PodExecOptions" :action "connect"}
           {:path-params  {:namespace "default" :name "hello-world"}
            :query-params {:command "sh" :stdout true :tty true}}))
+
+
+  (with-open [reader (clojure.java.io/reader
+                       (logs client
+                             {:operation "readCoreV1NamespacedPodLog"}
+                             {:path-params
+                              {:namespace "kube-system"
+                               :name      "kube-proxy-p6mm5"}}))]
+    (loop []
+      (if (.ready reader)
+        (do (println (.readLine reader))
+            (recur))
+        (do (Thread/sleep 50)
+            (recur)))))
 
   )

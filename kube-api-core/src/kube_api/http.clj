@@ -62,4 +62,7 @@
 
 
 (defn without-read-timeout [^OkHttpClient client]
-  (http/create-client client {:read-timeout 0}))
+  (http/create-client
+    client
+    {:read-timeout 0
+     :protocols ["http/1.1"]}))
