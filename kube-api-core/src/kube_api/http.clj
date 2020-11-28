@@ -1,12 +1,26 @@
 (ns kube-api.http
   (:require [clojure.string :as strings]
-            [muuntaja.core :as m]
             [kube-api.utils :as utils]
             [clj-okhttp.core :as http])
-  (:import [java.io InputStream]
-           [clojure.lang IObj]
-           [okhttp3 OkHttpClient$Builder OkHttpClient]
-           [java.util.concurrent TimeUnit]))
+  (:import [okhttp3 OkHttpClient]
+           [java.io FilterInputStream InputStream]
+           [clojure.lang IObj]))
+
+(defprotocol IntoIObj
+  (into-i-obj [this] "Turns object into something that supports metadata."))
+
+(extend-protocol IntoIObj
+  IObj
+  (into-i-obj [^IObj this] this)
+
+  InputStream
+  (into-i-obj [^InputStream this]
+    (let [metadata (volatile! {})]
+      (proxy [FilterInputStream IObj] [this]
+        (meta [this]
+          (deref metadata))
+        (withMeta [this meta]
+          (vreset! metadata meta))))))
 
 
 (defn wrap-prepare-request [handler auth-config]
@@ -30,26 +44,14 @@
 
 (defn wrap-prepare-response [handler]
   (letfn [(prepare-response [{:keys [body] :as response}]
-            (let [final-body (cond->> body
-                                      (instance? InputStream body)
-                                      (m/decode "application/json"))]
-              (if (and (map? response) (instance? IObj final-body))
-                (with-meta final-body (meta response))
+            (let [metadata (meta response)]
+              (if (satisfies? IntoIObj body)
+                (with-meta (into-i-obj body) metadata)
                 response)))]
     (fn prepare-response-handler
-      ([request]
-       (cond-> (handler request)
-         (not= :stream (:as request))
-         (prepare-response)))
+      ([request] (prepare-response (handler request)))
       ([request respond raise]
-       (handler request
-                (fn [response]
-                  (respond
-                    (cond-> response
-                      (not= :stream (:as request))
-                      (prepare-response))))
-                raise)))))
-
+       (handler request (comp respond prepare-response) raise)))))
 
 (defn make-http-client
   "Creates a new http client prepared to make authenticated requests to the selected cluster."
@@ -62,7 +64,4 @@
 
 
 (defn without-read-timeout [^OkHttpClient client]
-  (http/create-client
-    client
-    {:read-timeout 0
-     :protocols ["http/1.1"]}))
+  (http/create-client client {:read-timeout 0}))

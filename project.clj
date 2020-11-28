@@ -32,13 +32,14 @@
   :dependencies
   [[org.clojars.rutledgepaulv/kube-api-core "0.1.0-SNAPSHOT"]
    [org.clojars.rutledgepaulv/kube-api-controllers "0.1.0-SNAPSHOT"]
-   [org.clojars.rutledgepaulv/kube-api-term "0.1.0-SNAPSHOT"]]
+   [org.clojars.rutledgepaulv/kube-api-term "0.1.0-SNAPSHOT"]
+   [org.clojars.rutledgepaulv/kube-api-io "0.1.0-SNAPSHOT"]]
 
   :plugins
   [[lein-sub "0.3.0"]]
 
   :sub
-  ["kube-api-core" "kube-api-controllers" "kube-api-term"]
+  ["kube-api-core" "kube-api-controllers" "kube-api-io" "kube-api-term"]
 
   :aliases
   {"test"    ["sub" "test"]

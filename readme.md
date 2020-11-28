@@ -2,18 +2,18 @@
 
 ## What
 
-A set of Clojure libraries for interacting with Kubernetes from a Clojure application / repl. 
-Composed of a core kubernetes client + some higher level constructs built on top of the client
-(usually with some added dependencies). 
+A set of Clojure libraries for interacting with Kubernetes from a Clojure application / repl. Composed of a core
+kubernetes client + various modules offering higher level constructs (usually with some added dependencies).
 
 ## Why
 
-Some Clojure Kubernetes libraries already exist, but they're not very comprehensive. I want
-something robust enough that I can write production cluster operators in Clojure. The fabric8
-client for java is robust and comprehensive but it's somewhat painful to use from Clojure and
-any attempts to layer over it would likely result in something similar to amazonica, and anyone 
-who has used cognitect's aws-api knows how much nicer it is to have a data driven API.
+Some Clojure Kubernetes libraries already exist, but they're not comprehensive. I want something robust enough that I
+can write production cluster integrations (controllers, operators, etc) in Clojure. I really enjoy the data orientation
+that you find in other Clojure libraries like cognitect's aws-api and have tried to provide the same here.
 
+The [fabric8.io kubernetes client](https://github.com/fabric8io/kubernetes-client) for java is robust and comprehensive
+but it's rather painful to use from Clojure due to its focus on OOP ergonomics. That said, the fabric8 implementation
+has been my primary reference for implementing hairy IO.
 
 ## Modules
 
@@ -27,9 +27,13 @@ This module bundles all modules (described below) for ease of use.
 
 [View code examples](./kube-api-core)
 
-This implements the basic REST / websocket client code to communicate with the Kubernetes API. It defines the available
-operations using the swagger specification served from the remote Kubernetes cluster. You can use this to CRUD on
-Kubernetes resources and to just explore the available operations.
+This implements the basic REST and websocket client code to communicate with the Kubernetes API. It defines the
+available operations using the swagger specification served from the remote Kubernetes cluster. You can use this to CRUD
+on Kubernetes resources and to explore the available operations.
+
+Note that this core is intentionally minimal. All interactions with Kubernetes boil down to either some http calls or
+some websocket connections and that's all this module provides. If you're looking for more complex things like
+`exec` and `port-forward` have a look at the kube-api-io module that creates those things from these blocks.
 
 Inspired by:
 
@@ -43,12 +47,25 @@ Leverages:
 
 ---
 
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-io.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-io)
+
+[View code examples](./kube-api-io)
+
+This implements higher level IO constructs like those you're accustomed to from kubectl. This is where you'll find
+things like `exec`, `attach`, `logs`, `port-forward`, `proxy`, and `cp`.
+
+Leverages:
+
+- Java IO / NIO
+
+---
+
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-term.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-term)
 
 [View code examples](./kube-api-term)
 
-This adapts the byte streams of a Kubernetes "exec" call into a terminal emulator so you can display an interactive
-shell into the selected Kubernetes pod.
+This module adapts the byte streams and command channel of an `exec` call into the requirements of a terminal emulator
+so you can display an interactive shell into the selected Kubernetes pod.
 
 Leverages:
 
@@ -62,7 +79,7 @@ Leverages:
 
 This satisfies the same goals as the tools/cache package from the standard go client. Provides machinery for writing
 controllers (aka operators) that manages threads, watches, retries, and state for you so that your user space controller
-implementation doesn't have to worry about so many details.
+implementation doesn't need to worry about so many details.
 
 Inspired by:
 

@@ -1,7 +1,7 @@
 (ns kube-api.term.core
-  (:require [kube-api.core :as kube]
+  (:require [kube-api.io.core :as kube]
             [kube-api.term.ui :as ui]
-            [kube-api.io :as io])
+            [kube-api.io.io :as io])
   (:import [java.io OutputStream BufferedReader]
            [com.jediterm.terminal TtyConnector]
            [okhttp3 WebSocket]))

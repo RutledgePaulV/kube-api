@@ -6,8 +6,7 @@
             [clojure.set :as sets]
             [clojure.java.io :as io]
             [clojure.edn :as edn]
-            [clojure.string :as strings]
-            [lambdaisland.deep-diff2 :as diff]))
+            [clojure.string :as strings]))
 
 
 ; kubernetes specific extensions because these swagger specs are insufficiently

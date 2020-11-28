@@ -1,16 +1,14 @@
 (ns kube-api.core
+  "The 'small core' of kube-api. Lets you invoke API operations."
   (:require [clj-okhttp.core :as http]
             [kube-api.utils :as utils]
             [kube-api.auth :as auth]
             [kube-api.swagger.kubernetes :as swag]
             [kube-api.http :as kube-http]
             [malli.generator :as gen]
-            [muuntaja.core :as m]
-            [clojure.tools.logging :as log]
-            [kube-api.io :as io])
-  (:import [okhttp3 Response WebSocket Call]
-           [okio ByteString]
-           [java.io OutputStream Closeable InputStream FilterInputStream IOException Reader InputStreamReader]))
+            [clojure.tools.logging :as log])
+  (:import [okhttp3 Response WebSocket]
+           [okio ByteString]))
 
 
 (defonce validation
@@ -55,7 +53,7 @@
          (let [{:keys [http-client] :as full-context}
                (update context :http-client #(or % (kube-http/make-http-client context)))]
            (with-meta full-context
-             (let [swagger    (delay (http/get http-client "/openapi/v2"))
+             (let [swagger    (delay (http/get http-client "/openapi/v2" {:as :json}))
                    operations (delay (swag/kube-swagger->operation-views (deref swagger)))]
                {:swagger swagger :operations operations}))))
      (recur (auth/select-context context)))))
@@ -173,13 +171,30 @@
      (http/request* http-client final-request respond raise))))
 
 
+(defn invoke-stream
+  "Like invoke, but for streaming responses. For example, you would use this
+   to access a pod's logs which are returned as a streaming body"
+  ([{:keys [http-client] :as client} op-selector request]
+   (let [final-http-client
+         (kube-http/without-read-timeout http-client)
+         final-request
+         (assoc (prepare-invoke-request client op-selector request) :as :stream)]
+     (http/request* final-http-client final-request)))
+  ([{:keys [http-client] :as client} op-selector request respond raise]
+   (let [final-client
+         (kube-http/without-read-timeout http-client)
+         final-request
+         (assoc (prepare-invoke-request client op-selector request) :as :stream)]
+     (http/request* final-client final-request respond raise))))
+
+
 (defn connect
   "Submits the provided request for the specified operation to the server
    as part of a websocket upgrade request. If the upgrade succeeds then
    messages from the server will invoke the provided callbacks. Returns
    a okhttp3.Websocket instance. Does not automatically reconnect if the
    connection breaks. If you need reliable reconnection behaviors please
-   see the related kube-api-controllers module."
+   see `listwatcher.clj` in the related kube-api-controllers module."
   (^WebSocket [client op-selector callbacks]
    (connect client op-selector {} callbacks))
   (^WebSocket [{:keys [http-client] :as client} op-selector request callbacks]
@@ -191,117 +206,24 @@
               :on-text    (fn default-on-text [^WebSocket socket ^String message]
                             (log/info "Websocket received text frame."))
               :on-closing (fn default-on-closing [^WebSocket socket ^Long code ^String reason]
-                            (log/infof "Websocket connection is closing with code '%d' and reason '%s'." code reason))
+                            (log/infof "Websocket connection is closing with code '%d' and reason '%s'." code reason)
+                            (.close socket code reason))
               :on-closed  (fn default-on-closed [^WebSocket socket ^Long code ^String reason]
                             (log/infof "Websocket connection closed with code '%d' and reason '%s'." code reason))
               :on-failure (fn default-on-failure [^WebSocket socket exception ^Response response]
                             (let [status  (.code response)
                                   message (.string (.body response))]
                               (log/errorf exception "Connection failure with response code '%d' and message '%s'." status message)))}
-             (merge callbacks)
-             (update :on-text (fn [handler]
-                                (fn [socket message]
-                                  (handler socket
-                                           (try (m/decode "application/json" message)
-                                                (catch Exception e
-                                                  ; unsure if k8s ever sends non-json text frames
-                                                  message)))))))
-
+             (merge callbacks))
          final-request
          (cond->
            (prepare-invoke-request client op-selector request)
            :always (assoc-in [:request-method] :get)
            (= "connect" (get op-selector :action))
            (assoc-in [:headers "Sec-WebSocket-Protocol"] "v4.channel.k8s.io"))
-         clone-client
+         final-client
          (kube-http/without-read-timeout http-client)]
-     (http/connect clone-client final-request final-callbacks))))
-
-
-(defn exec
-  "Builds on 'connect' to implement process<>process communications using byte streams
-   multiplexed over a single websocket connection. Returns a map of input/output streams
-   that you can use to communicate with the process spawned in the pod."
-  [client op-selector request]
-  (let [channels    (cond-> {:meta (io/piped-pair)}
-                      (true? (get-in request [:query-params :stdout]))
-                      (assoc :out (io/piped-pair))
-                      (true? (get-in request [:query-params :stderr]))
-                      (assoc :err (io/piped-pair))
-                      (true? (get-in request [:query-params :stdin]))
-                      (assoc :in (io/piped-pair)))
-        pump-holder (promise)
-        callbacks   {:on-open    (fn [^WebSocket socket response]
-                                   (when (contains? channels :in)
-                                     (let [in (get-in channels [:in :in])]
-                                       (deliver pump-holder (future (io/pumper in (byte 0) (fn [^bytes bites] (.send socket (ByteString/of bites)))))))))
-                     :on-bytes   (fn [socket ^ByteString message]
-                                   (let [channel (.getByte message 0)
-                                         bites   (.toByteArray (.substring message 1))]
-                                     (case channel
-                                       1 (.write ^OutputStream (get-in channels [:out :out]) bites)
-                                       2 (.write ^OutputStream (get-in channels [:err :out]) bites)
-                                       3 (.write ^OutputStream (get-in channels [:meta :out]) bites)
-                                       (throw (ex-info "Unknown byte stream channel." {})))))
-                     :on-closing (fn [socket code reason]
-                                   (.close socket code reason))
-                     :on-closed  (fn [socket code reason]
-                                   (doseq [^Closeable close
-                                           (filter some? [(get-in channels [:in :in])
-                                                          (get-in channels [:out :out])
-                                                          (get-in channels [:err :out])
-                                                          (get-in channels [:meta :out])])]
-                                     (.close close))
-                                   (when (realized? pump-holder)
-                                     (when-some [fut (deref pump-holder)]
-                                       (future-cancel fut))))}
-        socket      (connect client op-selector request callbacks)]
-    (cond-> {:socket socket}
-      (contains? channels :out)
-      (assoc :stdout (get-in channels [:out :in]))
-      (contains? channels :err)
-      (assoc :stderr (get-in channels [:err :in]))
-      (contains? channels :in)
-      (assoc :stdin (get-in channels [:in :out]))
-      (contains? channels :errors)
-      (assoc :meta (get-in channels [:meta :in])))))
-
-
-(defn logs
-  "Returns an input stream that will load stream the logs for the selected pod.
-   Typically you will want to wrap the stream with a BufferedReader to consume
-   it one line of logs at a time."
-  ([{:keys [http-client] :as client} op-selector request]
-   (let [final-http-client
-         (kube-http/without-read-timeout http-client)
-         final-request
-         (-> (prepare-invoke-request client op-selector request)
-             (assoc :as :stream)
-             (assoc-in [:query-params :follow] true))
-         {:keys [^InputStream in ^OutputStream out]}
-         (io/piped-pair)
-         pumper
-         (promise)
-         call
-         ^Call (http/request*
-                 final-http-client
-                 final-request
-                 (fn [response]
-                   (deliver pumper (Thread/currentThread))
-                   (with-open [in (get response :body)]
-                     (io/pumper in #(.write out ^bytes %))))
-                 (fn [exception]
-                   (log/error exception "Received error response when opening log stream.")
-                   (.close in)
-                   (.close out)))]
-     (proxy [FilterInputStream] [in]
-       (close []
-         (when (realized? pumper)
-           (.interrupt (deref pumper)))
-         (.close in)
-         (.close out)
-         (.cancel call))))))
-
+     (http/connect final-client final-request final-callbacks))))
 
 
 
@@ -309,31 +231,31 @@
 
   (def client (create-client "microk8s"))
 
+  ; getting a pod by name
+
+  (invoke client
+          {:operation "get" :kind "Pod"}
+          {:path-params {:namespace "kube-system"
+                         :name      "kube-proxy-p6mm5"}})
+
+  ; watching changes to deployments in the kube-system namespace
   (connect client
-           {:action "watch" :kind "Deployment"}
+           {:action "list" :kind "Deployment"}
            {:path-params  {:namespace "kube-system"}
             :query-params {:watch true}}
            {:on-text
             (fn [socket message]
               (println (get-in message [:object :metadata :labels])))})
 
-  (def result
-    (exec client {:kind "PodExecOptions" :action "connect"}
-          {:path-params  {:namespace "default" :name "hello-world"}
-           :query-params {:command "sh" :stdout true :tty true}}))
 
-
-  (with-open [reader (clojure.java.io/reader
-                       (logs client
+  ; getting the logs from a pod
+  (def stream (invoke-stream client
                              {:operation "readCoreV1NamespacedPodLog"}
                              {:path-params
                               {:namespace "kube-system"
-                               :name      "kube-proxy-p6mm5"}}))]
-    (loop []
-      (if (.ready reader)
-        (do (println (.readLine reader))
-            (recur))
-        (do (Thread/sleep 50)
-            (recur)))))
+                               :name      "kube-proxy-p6mm5"}}))
+
+  (with-open [reader (clojure.java.io/reader stream)]
+    (while true (println (.readLine reader))))
 
   )

@@ -29,7 +29,7 @@
 
   :dependencies
   [[org.clojure/clojure "1.10.1"]
-   [org.clojars.rutledgepaulv/kube-api-core "0.1.0-SNAPSHOT"]
+   [org.clojars.rutledgepaulv/kube-api-io "0.1.0-SNAPSHOT"]
    [org.jetbrains.jediterm/jediterm-pty "2.31"]
    [com.google.guava/guava "30.0-jre"]
    [com.formdev/flatlaf "0.44"]

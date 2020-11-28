@@ -2,7 +2,8 @@
   (:require [clojure.core.async :as async]
             [kube-api.core :as kube]
             [kube-api.controllers.utils :as utils]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [muuntaja.core :as m])
   (:import [okhttp3 Response WebSocket]))
 
 
@@ -48,8 +49,9 @@
                      (volatile! resource-version)
                      callbacks
                      {:on-text
-                      (fn [^WebSocket socket {:keys [type object] :as message}]
-                        (let [new-resource-version (utils/resource-version object)]
+                      (fn [^WebSocket socket text]
+                        (let [{:keys [type object] :as message} (m/decode "application/json" text)
+                              new-resource-version (utils/resource-version object)]
                           (vreset! last-observed-version new-resource-version)
                           (when (contains? #{"ADDED" "MODIFIED" "DELETED"} type)
                             (when-not (async/>!! return-chan (assoc (update message :object prep-object) :kind (get op-selector :kind)))

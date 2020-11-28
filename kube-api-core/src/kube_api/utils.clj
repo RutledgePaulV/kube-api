@@ -77,7 +77,6 @@
   ([pred coll not-found]
    (reduce (fn [nf x] (if (pred x) (reduced x) nf)) not-found coll)))
 
-
 (defn validation-error [message schema data]
   (let [error     (-> schema
                       (mu/closed-schema)
