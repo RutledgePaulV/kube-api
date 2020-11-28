@@ -4,13 +4,14 @@
   "A Kubernetes controller library for Clojure."
 
   :url
-  "https://github.com/rutledgepaulv/kube-api"
+  "https://github.com/rutledgepaulv/kube-api/kube-api-controllers"
 
   :license
   {:name "MIT License" :url "http://opensource.org/licenses/MIT" :year 2020 :key "mit"}
 
   :scm
-  {:dir ".."}
+  {:name "git" :url "https://github.com/rutledgepaulv/kube-api"}
+
 
   :pom-addition
   [:developers
