@@ -19,7 +19,7 @@ has been my primary reference when implementing hairy IO.
 
 ### kube-api/kube-api
 
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api)
+[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api.svg)](https://clojars.org/kube-api/kube-api)
 
 This module bundles all modules (described below) for ease of use.
 
@@ -27,7 +27,7 @@ This module bundles all modules (described below) for ease of use.
 
 ### kube-api/kube-api-core
 
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-core.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-core)
+[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-core.svg)](https://clojars.org/kube-api/kube-api-core)
 
 [View code examples](./kube-api-core)
 
@@ -54,7 +54,7 @@ Leverages:
 
 ### kube-api/kube-api-io
 
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-io.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-io)
+[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-io.svg)](https://clojars.org/kube-api/kube-api-io)
 
 [View code examples](./kube-api-io)
 
@@ -69,7 +69,7 @@ Leverages:
 
 ### kube-api/kube-api-controllers
 
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-controllers.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-controllers)
+[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-controllers.svg)](https://clojars.org/kube-api/kube-api-controllers)
 
 [View code examples](./kube-api-controllers)
 
@@ -87,9 +87,9 @@ Leverages:
 
 --- 
 
-#### kube-api/kube-api-term
+### kube-api/kube-api-term
 
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-term.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-term)
+[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-term.svg)](https://clojars.org/kube-api/kube-api-term)
 
 [View code examples](./kube-api-term)
 

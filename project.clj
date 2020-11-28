@@ -1,4 +1,4 @@
-(defproject org.clojars.rutledgepaulv/kube-api "0.1.0-SNAPSHOT"
+(defproject kube-api/kube-api "0.1.0-SNAPSHOT"
 
   :description
   "A set of Kubernetes libraries for Clojure."
@@ -30,10 +30,10 @@
   []
 
   :dependencies
-  [[org.clojars.rutledgepaulv/kube-api-core "0.1.0-SNAPSHOT"]
-   [org.clojars.rutledgepaulv/kube-api-controllers "0.1.0-SNAPSHOT"]
-   [org.clojars.rutledgepaulv/kube-api-term "0.1.0-SNAPSHOT"]
-   [org.clojars.rutledgepaulv/kube-api-io "0.1.0-SNAPSHOT"]]
+  [[kube-api/kube-api-core "0.1.0-SNAPSHOT"]
+   [kube-api/kube-api-controllers "0.1.0-SNAPSHOT"]
+   [kube-api/kube-api-term "0.1.0-SNAPSHOT"]
+   [kube-api/kube-api-io "0.1.0-SNAPSHOT"]]
 
   :plugins
   [[lein-sub "0.3.0"]]

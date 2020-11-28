@@ -1,4 +1,4 @@
-(defproject org.clojars.rutledgepaulv/kube-api-io "0.1.0-SNAPSHOT"
+(defproject kube-api/kube-api-io "0.1.0-SNAPSHOT"
 
   :description
   "A Kubernetes io (exec / port-forward) library for Clojure."
@@ -25,4 +25,4 @@
 
   :dependencies
   [[org.clojure/clojure "1.10.1"]
-   [org.clojars.rutledgepaulv/kube-api-core "0.1.0-SNAPSHOT"]])
+   [kube-api/kube-api-core "0.1.0-SNAPSHOT"]])

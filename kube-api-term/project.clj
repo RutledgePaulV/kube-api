@@ -1,4 +1,4 @@
-(defproject org.clojars.rutledgepaulv/kube-api-term "0.1.0-SNAPSHOT"
+(defproject kube-api/kube-api-term "0.1.0-SNAPSHOT"
 
   :description
   "A library for opening emulated terminals into kubernetes pods from Clojure."
@@ -29,7 +29,7 @@
 
   :dependencies
   [[org.clojure/clojure "1.10.1"]
-   [org.clojars.rutledgepaulv/kube-api-io "0.1.0-SNAPSHOT"]
+   [kube-api/kube-api-io "0.1.0-SNAPSHOT"]
    [org.jetbrains.jediterm/jediterm-pty "2.31"]
    [com.google.guava/guava "30.0-jre"]
    [com.formdev/flatlaf "0.44"]

@@ -1,4 +1,4 @@
-(defproject org.clojars.rutledgepaulv/kube-api-controllers "0.1.0-SNAPSHOT"
+(defproject kube-api/kube-api-controllers "0.1.0-SNAPSHOT"
 
   :description
   "A Kubernetes controller library for Clojure."
@@ -25,7 +25,7 @@
 
   :dependencies
   [[org.clojure/clojure "1.10.1"]
-   [org.clojars.rutledgepaulv/kube-api-core "0.1.0-SNAPSHOT"]
+   [kube-api/kube-api-core "0.1.0-SNAPSHOT"]
    [org.clojure/core.async "1.3.610"]]
 
   :profiles
