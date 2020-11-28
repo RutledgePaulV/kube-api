@@ -13,15 +13,19 @@ that you find in other Clojure libraries like cognitect's aws-api and have tried
 
 The [fabric8.io kubernetes client](https://github.com/fabric8io/kubernetes-client) for java is robust and comprehensive
 but it's rather painful to use from Clojure due to its focus on OOP ergonomics. That said, the fabric8 implementation
-has been my primary reference for implementing hairy IO.
+has been my primary reference when implementing hairy IO.
 
 ## Modules
+
+### kube-api/kube-api
 
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api)
 
 This module bundles all modules (described below) for ease of use.
 
 ---
+
+### kube-api/kube-api-core
 
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-core.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-core)
 
@@ -33,7 +37,8 @@ on Kubernetes resources and to explore the available operations.
 
 Note that this core is intentionally minimal. All interactions with Kubernetes boil down to either some http calls or
 some websocket connections and that's all this module provides. If you're looking for more complex things like
-`exec` and `port-forward` have a look at the kube-api-io module that creates those things from these blocks.
+`exec` and `port-forward` have a look at the [kube-api-io](./kube-api-io) module that creates those things from these
+blocks.
 
 Inspired by:
 
@@ -46,6 +51,8 @@ Leverages:
 - [clj-okhttp](https://github.com/rutledgepaulv/clj-okhttp)
 
 ---
+
+### kube-api/kube-api-io
 
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-io.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-io)
 
@@ -60,18 +67,7 @@ Leverages:
 
 ---
 
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-term.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-term)
-
-[View code examples](./kube-api-term)
-
-This module adapts the byte streams and command channel of an `exec` call into the requirements of a terminal emulator
-so you can display an interactive shell into the selected Kubernetes pod.
-
-Leverages:
-
-- [jediterm](https://github.com/JetBrains/jediterm)
-
----
+### kube-api/kube-api-controllers
 
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-controllers.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-controllers)
 
@@ -90,6 +86,21 @@ Leverages:
 - [core.async](https://github.com/clojure/core.async)
 
 --- 
+
+#### kube-api/kube-api-term
+
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/kube-api-term.svg)](https://clojars.org/org.clojars.rutledgepaulv/kube-api-term)
+
+[View code examples](./kube-api-term)
+
+This module adapts the byte streams and command channel of an `exec` call into the requirements of a terminal emulator
+so you can display an interactive shell into the selected Kubernetes pod.
+
+Leverages:
+
+- [jediterm](https://github.com/JetBrains/jediterm)
+
+---
 
 ## License
 
