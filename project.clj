@@ -43,4 +43,5 @@
 
   :aliases
   {"test"    ["sub" "test"]
+   "deploy"  ["sub" "deploy"]
    "install" ["sub" "install"]})
