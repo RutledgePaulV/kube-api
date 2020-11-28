@@ -2,8 +2,8 @@
 
 ## What
 
-A set of Clojure libraries for interacting with Kubernetes from a Clojure application / repl. Composed of a core
-kubernetes client + various modules offering higher level constructs (usually with some added dependencies).
+A set of Clojure libraries for interacting with Kubernetes from Clojure applications. Composed of a core Kubernetes
+client + various modules offering higher level constructs (sometimes with added dependencies).
 
 ## Why
 
@@ -13,7 +13,7 @@ that you find in other Clojure libraries like cognitect's aws-api and have tried
 
 The [fabric8.io kubernetes client](https://github.com/fabric8io/kubernetes-client) for java is robust and comprehensive
 but it's rather painful to use from Clojure due to its focus on OOP ergonomics. That said, the fabric8 implementation
-has been my primary reference when implementing hairy IO.
+has been my primary reference when implementing the trickier pieces of IO.
 
 ## Modules
 
@@ -99,6 +99,17 @@ so you can display an interactive shell into the selected Kubernetes pod.
 Leverages:
 
 - [jediterm](https://github.com/JetBrains/jediterm)
+
+---
+
+### kube-api/kube-api-ring
+
+[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-ring.svg)](https://clojars.org/kube-api/kube-api-ring)
+
+[View code examples](./kube-api-ring)
+
+This module implements ring middleware for pod source ip based authentication. You can use this for service<>service
+authentication within a Kubernetes cluster (so long as the traffic originates from elsewhere in the cluster).
 
 ---
 

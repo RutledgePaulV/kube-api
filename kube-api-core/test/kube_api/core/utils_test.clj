@@ -1,6 +1,6 @@
-(ns kube-api.utils-test
+(ns kube-api.core.utils-test
   (:require [clojure.test :refer :all])
-  (:require [kube-api.utils :refer [merge+]]))
+  (:require [kube-api.core.utils :refer :all]))
 
 (deftest merge+-test
   (is (true? true)))

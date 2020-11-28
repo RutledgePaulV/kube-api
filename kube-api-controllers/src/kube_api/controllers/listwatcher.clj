@@ -1,6 +1,6 @@
 (ns kube-api.controllers.listwatcher
   (:require [clojure.core.async :as async]
-            [kube-api.core :as kube]
+            [kube-api.core.core :as kube]
             [kube-api.controllers.utils :as utils]
             [clojure.tools.logging :as log]
             [muuntaja.core :as m])
@@ -14,7 +14,8 @@
    will close itself on the next event."
   [client op-selector request]
   (let [return-chan (async/chan)
-        prep-object (fn [object] (update object :kind #(or % (get op-selector :kind))))]
+        final-selector (first (kube/ops client op-selector))
+        prep-object (fn [object] (update object :kind #(or % (get final-selector :kind))))]
     (letfn [(start-from-list
               ([]
                (start-from-list "0"))
@@ -27,7 +28,7 @@
                      respond      (fn [list-response]
                                     (let [objects (mapv prep-object (get list-response :items []))]
                                       (when (async/>!! return-chan {:type   "SYNC"
-                                                                    :kind   (get op-selector :kind)
+                                                                    :kind   (get final-selector :kind)
                                                                     :object objects})
                                         (start-watching-at (utils/resource-version list-response)))))
                      raise        (fn [exception]
@@ -35,7 +36,7 @@
                                     (let [wait (first backoff-seq)]
                                       (Thread/sleep wait)
                                       (start-from-list resource-version (rest backoff-seq))))]
-                 (kube/invoke client op-selector list-request respond raise))))
+                 (kube/invoke client final-selector list-request respond raise))))
             (start-watching-at
               ([resource-version]
                (start-watching-at resource-version (take 10 (utils/backoff-seq 300000))))

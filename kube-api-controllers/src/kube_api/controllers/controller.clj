@@ -37,7 +37,7 @@
           (if (async/offer! worker-chan event)
             (recur)
             (do (async/>! feedback event)
-                (async/<! (async/timeout 1000))
+                (async/<! (async/timeout 50))
                 (recur))))
         (run! async/close! (vals @workers))))))
 

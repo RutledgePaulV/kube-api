@@ -1,4 +1,4 @@
-(ns kube-api.utils
+(ns kube-api.core.utils
   (:require [clojure.string :as strings]
             [malli.core :as m]
             [malli.error :as me]

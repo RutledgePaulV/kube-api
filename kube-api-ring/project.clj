@@ -1,10 +1,10 @@
-(defproject kube-api/kube-api-io "0.1.0-SNAPSHOT"
+(defproject kube-api/kube-api-ring "0.1.0-SNAPSHOT"
 
   :description
-  "A Kubernetes io library for Clojure (exec, attach, port-forward, proxy, etc)."
+  "A library for implementing "
 
   :url
-  "https://github.com/rutledgepaulv/kube-api/kube-api-io"
+  "https://github.com/rutledgepaulv/kube-api/kube-api-ring"
 
   :license
   {:name "MIT License" :url "http://opensource.org/licenses/MIT" :year 2020 :key "mit"}
@@ -21,8 +21,10 @@
     [:timezone "-5"]]]
 
   :deploy-repositories
-  [["releases" :clojars] ["snapshots" :clojars]]
+  [["releases" :clojars]
+   ["snapshots" :clojars]]
 
   :dependencies
   [[org.clojure/clojure "1.10.1"]
-   [kube-api/kube-api-core "0.1.0-SNAPSHOT"]])
+   [kube-api/kube-api-controllers "0.1.0-SNAPSHOT"]
+   [org.clojars.rutledgepaulv/ring-firewall-middleware "0.1.5"]])

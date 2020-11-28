@@ -1,9 +1,9 @@
-(ns kube-api.swagger.swagger
+(ns kube-api.core.swagger.swagger
   "For turning a swagger specification into a set of operations
    described as data using malli schemas for requests and responses."
-  (:require [kube-api.swagger.malli :as malli]
+  (:require [kube-api.core.swagger.malli :as malli]
             [clojure.string :as strings]
-            [kube-api.utils :as utils]))
+            [kube-api.core.utils :as utils]))
 
 
 (defn compile-request-schema [swagger-spec params]

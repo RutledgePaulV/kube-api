@@ -3,7 +3,7 @@
 ```clojure
 
 (require '[kube-api.controllers.controller :as kcc])
-(require '[kube-api.core :as kube])
+(require '[kube-api.core.core :as kube])
 
 (defonce client (kube/create-client "microk8s"))
 

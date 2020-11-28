@@ -1,10 +1,10 @@
-(ns kube-api.core
+(ns kube-api.core.core
   "The 'small core' of kube-api. Lets you invoke API operations."
   (:require [clj-okhttp.core :as http]
-            [kube-api.utils :as utils]
-            [kube-api.auth :as auth]
-            [kube-api.swagger.kubernetes :as swag]
-            [kube-api.http :as kube-http]
+            [kube-api.core.utils :as utils]
+            [kube-api.core.auth :as auth]
+            [kube-api.core.swagger.kubernetes :as swag]
+            [kube-api.core.http :as kube-http]
             [malli.generator :as gen]
             [clojure.tools.logging :as log])
   (:import [okhttp3 Response WebSocket]

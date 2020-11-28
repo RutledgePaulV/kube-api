@@ -1,8 +1,8 @@
-(ns kube-api.auth
+(ns kube-api.core.auth
   (:require [clojure.string :as strings]
             [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
-            [kube-api.utils :as utils])
+            [kube-api.core.utils :as utils])
   (:import [java.io File]))
 
 (defn readable? [^File f]

@@ -1,5 +1,5 @@
 (ns kube-api.io.core
-  (:require [kube-api.core :as kube]
+  (:require [kube-api.core.core :as kube]
             [kube-api.io.io :as io])
   (:import [okhttp3 WebSocket]
            [okio ByteString]

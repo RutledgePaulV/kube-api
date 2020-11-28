@@ -37,7 +37,7 @@
   [["public-github" {:url "git://github.com"}]]
 
   :repl-options
-  {:init-ns kube-api.core}
+  {:init-ns kube-api.core.core}
 
   :profiles
   {:dev {:dependencies [[com.gfredericks/test.chuck "0.2.10"]]}})

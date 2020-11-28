@@ -1,6 +1,6 @@
-(ns kube-api.http
+(ns kube-api.core.http
   (:require [clojure.string :as strings]
-            [kube-api.utils :as utils]
+            [kube-api.core.utils :as utils]
             [clj-okhttp.core :as http])
   (:import [okhttp3 OkHttpClient]
            [java.io FilterInputStream InputStream]
@@ -17,10 +17,11 @@
   (into-i-obj [^InputStream this]
     (let [metadata (volatile! {})]
       (proxy [FilterInputStream IObj] [this]
-        (meta [this]
+        (meta []
           (deref metadata))
-        (withMeta [this meta]
-          (vreset! metadata meta))))))
+        (withMeta [meta]
+          (vreset! metadata meta)
+          this)))))
 
 
 (defn wrap-prepare-request [handler auth-config]

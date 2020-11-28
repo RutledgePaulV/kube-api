@@ -1,6 +1,6 @@
 (ns kube-api.controllers.listwatcher-test
   (:require [kube-api.controllers.listwatcher :refer :all]
-            [kube-api.core :as kube]
+            [kube-api.core.core :as kube]
             [lambdaisland.deep-diff2 :as diff]
             [clojure.core.async :as async]
             [clojure.test :refer :all]))

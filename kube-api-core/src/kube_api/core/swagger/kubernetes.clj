@@ -1,8 +1,8 @@
-(ns kube-api.swagger.kubernetes
+(ns kube-api.core.swagger.kubernetes
   "Kubernetes specific code for producing operation specifications."
-  (:require [kube-api.swagger.swagger :as swagger]
-            [kube-api.swagger.malli :as malli]
-            [kube-api.utils :as utils]
+  (:require [kube-api.core.swagger.swagger :as swagger]
+            [kube-api.core.swagger.malli :as malli]
+            [kube-api.core.utils :as utils]
             [clojure.set :as sets]
             [clojure.java.io :as io]
             [clojure.edn :as edn]

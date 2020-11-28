@@ -1,6 +1,6 @@
 (ns kube-api.controllers.controller-test
   (:require [kube-api.controllers.controller :as kcc]
-            [kube-api.core :as kube]
+            [kube-api.core.core :as kube]
             [clojure.test :refer :all]
             [lambdaisland.deep-diff2 :as diff]))
 

@@ -4,7 +4,7 @@
 ```clojure 
 
 (require '[kube-api.term.core :as ktc])
-(require '[kube-api.core :as kube])
+(require '[kube-api.core.core :as kube])
 
 (defonce client (kube/create-client "microk8s"))
 

@@ -1,8 +1,8 @@
-(ns kube-api.swagger.malli
+(ns kube-api.core.swagger.malli
   "Conversion from swagger's json-schema into malli schemas.
    Supports recursive definitions in the swagger schema by mapping
    to local malli registries."
-  (:require [kube-api.utils :as utils]))
+  (:require [kube-api.core.utils :as utils]))
 
 (def Base64Pattern #"^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$")
 (def DateTimePattern #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
