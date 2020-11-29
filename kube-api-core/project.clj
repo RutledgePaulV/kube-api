@@ -40,4 +40,5 @@
   {:init-ns kube-api.core.core}
 
   :profiles
-  {:dev {:dependencies [[com.gfredericks/test.chuck "0.2.10"]]}})
+  {:dev {:dependencies [[com.gfredericks/test.chuck "0.2.10"]
+                        [kube-api/kube-api-test "0.1.0-SNAPSHOT"]]}})

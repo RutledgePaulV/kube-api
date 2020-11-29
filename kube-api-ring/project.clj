@@ -27,4 +27,10 @@
   :dependencies
   [[org.clojure/clojure "1.10.1"]
    [kube-api/kube-api-controllers "0.1.0-SNAPSHOT"]
-   [org.clojars.rutledgepaulv/ring-firewall-middleware "0.1.5"]])
+   [org.clojars.rutledgepaulv/ring-firewall-middleware "0.1.5"]]
+
+  :profiles
+  {:dev {:dependencies [[kube-api/kube-api-test "0.1.0-SNAPSHOT"]]}}
+
+  :repl-options
+  {:init-ns kube-api.ring.core})

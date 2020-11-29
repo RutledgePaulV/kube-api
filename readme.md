@@ -113,6 +113,17 @@ authentication within a Kubernetes cluster (so long as the traffic originates fr
 
 ---
 
+### kube-api/kube-api-test
+
+[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-test.svg)](https://clojars.org/kube-api/kube-api-test)
+
+[View code examples](./kube-api-test)
+
+This module provides tooling to help write tests that can interact with an isolated kubernetes cluster
+using [kind](https://kind.sigs.k8s.io/). This module is used to test kube-api itself.
+
+---
+
 ## License
 
 This project is licensed under [MIT license](http://opensource.org/licenses/MIT).

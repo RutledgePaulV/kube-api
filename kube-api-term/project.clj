@@ -33,4 +33,10 @@
    [org.jetbrains.jediterm/jediterm-pty "2.31"]
    [com.google.guava/guava "30.0-jre"]
    [com.formdev/flatlaf "0.44"]
-   [log4j/log4j "1.2.17"]])
+   [log4j/log4j "1.2.17"]]
+
+  :profiles
+  {:dev {:dependencies [[kube-api/kube-api-test "0.1.0-SNAPSHOT"]]}}
+
+  :repl-options
+  {:init-ns kube-api.term.core})

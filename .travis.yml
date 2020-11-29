@@ -5,3 +5,5 @@ before_install:
 matrix:
   include:
     - jdk: openjdk13
+services:
+  - docker

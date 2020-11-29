@@ -25,4 +25,10 @@
 
   :dependencies
   [[org.clojure/clojure "1.10.1"]
-   [kube-api/kube-api-core "0.1.0-SNAPSHOT"]])
+   [kube-api/kube-api-core "0.1.0-SNAPSHOT"]]
+
+  :profiles
+  {:dev {:dependencies [[kube-api/kube-api-test "0.1.0-SNAPSHOT"]]}}
+
+  :repl-options
+  {:init-ns kube-api.io.core})

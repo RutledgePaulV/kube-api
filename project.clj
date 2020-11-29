@@ -40,7 +40,12 @@
   [[lein-sub "0.3.0"]]
 
   :sub
-  ["kube-api-core" "kube-api-controllers" "kube-api-io" "kube-api-ring" "kube-api-term"]
+  ["kube-api-test"
+   "kube-api-core"
+   "kube-api-controllers"
+   "kube-api-io"
+   "kube-api-ring"
+   "kube-api-term"]
 
   :aliases
   {"test"       ["sub" "test"]

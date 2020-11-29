@@ -12,7 +12,6 @@
   :scm
   {:name "git" :url "https://github.com/rutledgepaulv/kube-api"}
 
-
   :pom-addition
   [:developers
    [:developer
@@ -30,4 +29,8 @@
    [org.clojure/core.async "1.3.610"]]
 
   :profiles
-  {:dev {:dependencies [[lambdaisland/deep-diff2 "2.0.108"]]}})
+  {:dev {:dependencies [[lambdaisland/deep-diff2 "2.0.108"]
+                        [kube-api/kube-api-test "0.1.0-SNAPSHOT"]]}}
+
+  :repl-options
+  {:init-ns kube-api.controllers.controllers})
