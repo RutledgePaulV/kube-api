@@ -31,9 +31,9 @@
 
   :dependencies
   [[kube-api/kube-api-core "0.1.0-SNAPSHOT"]
-   [kube-api/kube-api-controllers "0.1.0-SNAPSHOT"]
    [kube-api/kube-api-term "0.1.0-SNAPSHOT"]
    [kube-api/kube-api-io "0.1.0-SNAPSHOT"]
+   [kube-api/kube-api-controllers "0.1.0-SNAPSHOT"]
    [kube-api/kube-api-ring "0.1.0-SNAPSHOT"]]
 
   :plugins
@@ -43,6 +43,6 @@
   ["kube-api-core" "kube-api-controllers" "kube-api-io" "kube-api-ring" "kube-api-term"]
 
   :aliases
-  {"test"    ["sub" "test"]
-   "deploy"  ["sub" "deploy"]
-   "install" ["sub" "install"]})
+  {"test"       ["sub" "test"]
+   "deploy-all" ["do" "deploy," "sub" "deploy"]
+   "install"    ["sub" "install"]})
