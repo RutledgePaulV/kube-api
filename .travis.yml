@@ -4,6 +4,6 @@ before_install:
   - lein install
 matrix:
   include:
-    - jdk: openjdk13
+    - jdk: openjdk15
 services:
   - docker
