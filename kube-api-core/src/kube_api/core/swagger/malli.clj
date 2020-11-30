@@ -90,15 +90,17 @@
         (and (empty? props) closed)
         [registry
          (if description
-           [:map-of {:description description} :string 'any?]
+           [:map-of {:description description}
+            [:or :string :keyword]
+            'any?]
            [:map-of :string 'any?])]
         (and (empty? props) (not closed))
         (let [[child-registry child]
               (*recurse* (:additionalProperties node) context registry)]
           [child-registry
            (if description
-             [:map-of {:description description} :string child]
-             [:map-of :string child])])
+             [:map-of {:description description} [:or :string :keyword] child]
+             [:map-of [:or :string :keyword] child])])
         (not-empty props)
         (let [children (map (fn [[k v]]
                               (let [[child-registry child] (*recurse* v context registry)

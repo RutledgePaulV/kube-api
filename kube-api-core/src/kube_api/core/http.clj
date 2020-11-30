@@ -4,7 +4,8 @@
             [clj-okhttp.core :as http])
   (:import [okhttp3 OkHttpClient]
            [java.io FilterInputStream InputStream]
-           [clojure.lang IObj]))
+           [clojure.lang IObj]
+           [java.util Base64]))
 
 (defprotocol IntoIObj
   (into-i-obj [this] "Turns object into something that supports metadata."))
@@ -54,13 +55,17 @@
       ([request respond raise]
        (handler request (comp respond prepare-response) raise)))))
 
+(defn base64-decode [^String s]
+  (when-not (strings/blank? s)
+    (String. (.decode (Base64/getDecoder) s))))
+
 (defn make-http-client
   "Creates a new http client prepared to make authenticated requests to the selected cluster."
   [context]
   (http/create-client
-    {:server-certificates (get-in context [:cluster :certificate-authority-data])
-     :client-certificate  (get-in context [:cluster :client-certificate-data])
-     :client-key          (get-in context [:cluster :client-key-data])
+    {:server-certificates (base64-decode (get-in context [:cluster :certificate-authority-data]))
+     :client-certificate  (base64-decode (get-in context [:user :client-certificate-data]))
+     :client-key          (base64-decode (get-in context [:user :client-key-data]))
      :middleware          [wrap-prepare-response #(wrap-prepare-request % context)]}))
 
 

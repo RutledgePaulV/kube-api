@@ -166,8 +166,8 @@
         remainder' (select views' selector')]
     (cond
       (empty? remainder')
-      (throw (ex-info "op-selector didn't match an available operation" {}))
+      (throw (ex-info "op-selector didn't match an available operation" {:selector selector}))
       (< 1 (count remainder'))
-      (throw (ex-info "op-selector not specific enough to identify operation" {}))
+      (throw (ex-info "op-selector not specific enough to identify operation" {:selector selector}))
       :otherwise
       (first remainder'))))

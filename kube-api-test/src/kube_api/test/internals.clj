@@ -1,10 +1,9 @@
 (ns kube-api.test.internals
   (:require [clojure.java.io :as io]
             [clojure.string :as strings])
-  (:import [java.util Properties AbstractMap$SimpleEntry]
+  (:import [java.util Properties]
            [org.testcontainers.containers GenericContainer]
-           [org.testcontainers.images.builder ImageFromDockerfile]
-           [org.testcontainers.utility ResourceReaper]))
+           [org.testcontainers.images.builder ImageFromDockerfile]))
 
 
 (def get-jar-version
@@ -33,11 +32,6 @@
     (.withFileSystemBind "/var/run/docker.sock" "/var/run/docker.sock")
     (.setPrivilegedMode true)
     (.start)))
-
-(defn register-cluster-for-removal [cluster-name]
-  (doto (ResourceReaper/instance)
-    (.registerFilterForCleanup
-      [(AbstractMap$SimpleEntry. "label" (str "io.x-k8s.kind.cluster=" cluster-name))])))
 
 (defn cleanup-yaml-formatting [s]
   (letfn [(replace [match]

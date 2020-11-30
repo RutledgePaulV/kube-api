@@ -48,7 +48,13 @@
    "
   ([] (create-client (auth/get-context)))
   ([context]
-   (if (map? context)
+   (cond
+     ; handled an entire kubeconfig
+     (and (map? context) (contains? context :contexts))
+     (recur (auth/current-context context))
+
+     ; presumably have a selected context, validate it in case
+     (map? context)
      (do (utils/validate! "Invalid context." auth/context-schema (dissoc context :http-client))
          (let [{:keys [http-client] :as full-context}
                (update context :http-client #(or % (kube-http/make-http-client context)))]
@@ -56,7 +62,12 @@
              (let [swagger    (delay (http/get http-client "/openapi/v2" {:as :json}))
                    operations (delay (swag/kube-swagger->operation-views (deref swagger)))]
                {:swagger swagger :operations operations}))))
-     (recur (auth/select-context context)))))
+
+     (or (string? context) (keyword? context))
+     (recur (auth/select-context (name context)))
+
+     :otherwise
+     (throw (IllegalArgumentException. "This is not a valid context for building a client.")))))
 
 
 (defn swagger-specification

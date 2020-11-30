@@ -2,7 +2,8 @@
   (:require [clojure.string :as strings]
             [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
-            [kube-api.core.utils :as utils])
+            [kube-api.core.utils :as utils]
+            [malli.util :as mu])
   (:import [java.io File]))
 
 (defn readable? [^File f]
@@ -64,21 +65,27 @@
 (defn get-context []
   (or (service-account) (current-context)))
 
-(def token-user-schema
+(def base-user-schema
   [:map
    [:client-key-data {:optional true} :string]
-   [:client-certificate-data {:optional true} :string]
-   [:token :string]])
+   [:client-certificate-data {:optional true} :string]])
+
+(def token-user-schema
+  (mu/merge
+    base-user-schema
+    [:map
+     [:token :string]]))
 
 (def basic-auth-user-schema
-  [:map
-   [:client-key-data {:optional true} :string]
-   [:client-certificate-data {:optional true} :string]
-   [:username :string]
-   [:password :string]])
+  (mu/merge
+    base-user-schema
+    [:map
+     [:username :string]
+     [:password :string]]))
 
 (def user-schema
   [:or
+   base-user-schema
    token-user-schema
    basic-auth-user-schema])
 

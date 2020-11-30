@@ -26,8 +26,8 @@
 
   :dependencies
   [[org.clojure/clojure "1.10.1"]
-   [org.testcontainers/testcontainers "1.15.0"]
-   [clj-commons/clj-yaml "0.7.2"]]
+   [clj-commons/clj-yaml "0.7.2"]
+   [org.testcontainers/testcontainers "1.15.0"]]
 
   :repl-options
   {:init-ns kube-api.test.core}
