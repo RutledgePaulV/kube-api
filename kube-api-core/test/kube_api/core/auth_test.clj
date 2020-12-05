@@ -17,7 +17,7 @@
           {:exec
            {:apiVersion ""
             :command    "cat"
-            :args       ["dig"]}})]
+            :args       [(.getAbsolutePath (io/file (io/resource "kube_api/token-response.json")))]}})]
     (is (= "Bearer my-bearer-token" (get-in response [:body :headers "Authorization"])))))
 
 (deftest basic-configuration
