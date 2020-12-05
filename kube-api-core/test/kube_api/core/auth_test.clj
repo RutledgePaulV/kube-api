@@ -4,22 +4,28 @@
             [clojure.java.io :as io]))
 
 
-(defn exercise-config [config]
+(defn exercise-user-config [config]
   (let [{:keys [middleware]}
         (inject-client-auth {} config)
         handler    (fn [request] {:status 200 :body request})
         handler+mw (reduce #(%2 %1) handler middleware)]
     (handler+mw {:uri "Test"})))
 
+(defn testfile-path [filename]
+  (.getAbsolutePath (io/file (io/resource (str "kube_api/" filename)))))
+
 (deftest exec-configuration
-  (let [response
-        (exercise-config
-          {:exec
-           {:apiVersion ""
-            :command    "cat"
-            :args       [(.getAbsolutePath (io/file (io/resource "kube_api/token-response.json")))]}})]
+  (let [response (exercise-user-config {:exec {:apiVersion "" :command "cat" :args [(testfile-path "token-response.json")]}})]
     (is (= "Bearer my-bearer-token" (get-in response [:body :headers "Authorization"])))))
 
 (deftest basic-configuration
-  (let [response (exercise-config {:username "paul" :password "hehe"})]
+  (let [response (exercise-user-config {:username "paul" :password "hehe"})]
     (is (= ["paul" "hehe"] (get-in response [:body :basic-auth])))))
+
+(deftest token-configuration
+  (let [response (exercise-user-config {:token "my-bearer-token2"})]
+    (is (= "Bearer my-bearer-token2" (get-in response [:body :headers "Authorization"])))))
+
+(deftest token-file-configuration
+  (let [response (exercise-user-config {:tokenFile (testfile-path "token.txt")})]
+    (is (= "Bearer my-bearer-token3" (get-in response [:body :headers "Authorization"])))))

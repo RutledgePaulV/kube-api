@@ -39,7 +39,9 @@
                (and (map? m1) (map? m2))
                (merge+ m1 m2)
                (and (sequential? m1) (sequential? m2))
-               (vec (concat m1 m2))
+               (into m1 m2)
+               (and (set? m1) (or (set? m2) (sequential? m2)))
+               (into m1 m2)
                :otherwise m2))]
      (merge-with inner-merge m1 m2)))
   ([m1 m2 & more]
