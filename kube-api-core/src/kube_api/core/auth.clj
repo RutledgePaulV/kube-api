@@ -25,15 +25,15 @@
   (fn [handler]
     (fn retry-handler
       ([request]
-       (let [response (handler (prepare-request request))]
+       (let [response (handler (prepare-request request false))]
          (if (should-retry? request response)
-           (handler (prepare-request request))
+           (handler (prepare-request request true))
            response)))
       ([request respond raise]
-       (handler (prepare-request request)
+       (handler (prepare-request request false)
                 (fn [response]
                   (if (should-retry? request response)
-                    (handler (prepare-request request) respond raise)
+                    (handler (prepare-request request true) respond raise)
                     (respond response)))
                 raise)))))
 
@@ -56,7 +56,7 @@
 ; https://kubernetes.io/docs/reference/access-authn-authz/authentication/#input-and-output-formats
 (defmethod inject-client-auth :exec-auth
   [client-opts {{:keys [command args env installHint] :or {args [] env []}} :exec}]
-  (let [holder (atom nil)]
+  (let [state (atom nil)]
     (letfn [(run []
               (let [full-command (into [command] args)
                     directory    (kubeconfig-dir)
@@ -80,18 +80,24 @@
                                      (str "Install hint:" \newline installHint)
                                      ""))
                            {:exit exit :err err :installHint installHint})))))
-            (stale? [holder-value]
-              (or (empty? holder-value)
-                  (and (contains? holder-value :expirationTimestamp)
-                       (not (pos? (compare (:expirationTimestamp holder-value) (str (Instant/now))))))))
-            (swapper [new-delay old]
-              (cond
-                (nil? old) new-delay
-                (not (realized? old)) old
-                (stale? old) new-delay
-                :otherwise old))
-            (gen-new-request [request]
-              (let [[kind data] (force (swap! holder (partial swapper (delay (run)))))]
+            (stale? [state]
+              (or (empty? state)
+                  (and (contains? state :expirationTimestamp)
+                       (not (pos? (compare (:expirationTimestamp state) (str (Instant/now))))))))
+            (gen-new-request [request force-new]
+              (let [new-delay (delay (run))
+                    swap-fn   (if force-new
+                                (fn [old]
+                                  (if (and (some? old) (not (realized? old)))
+                                    old
+                                    new-delay))
+                                (fn [old]
+                                  (cond
+                                    (nil? old) new-delay
+                                    (not (realized? old)) old
+                                    (stale? old) new-delay
+                                    :otherwise old)))
+                    [kind data] (force (swap! state swap-fn))]
                 (case kind
                   :exec-token-response
                   (assoc-in request [:headers "Authorization"] (str "Bearer " (get-in data [:status :token])))
@@ -105,9 +111,17 @@
     (update client-opts :middleware (fnil conj []) (normal-middleware prepare-request))))
 
 (defmethod inject-client-auth :token-file-auth [client-opts {:keys [tokenFile]}]
-  (letfn [(gen-new-request [request]
-            (assoc-in request [:headers "Authorization"] (str "Bearer " (slurp tokenFile))))]
-    (update client-opts :middleware (fnil conj []) (retry-middleware gen-new-request))))
+  (let [state (atom nil)]
+    (letfn [(gen-new-request [request force-new]
+              (let [new-delay (delay (slurp tokenFile))
+                    swap-fn   (if force-new
+                                ; swap it out unless a new one is already pending
+                                (fn [old] (if-not (realized? old) old new-delay))
+                                ; swap it out only if it's not been set yet
+                                #(or % new-delay))
+                    new-token (force (swap! state swap-fn))]
+                (assoc-in request [:headers "Authorization"] (str "Bearer " new-token))))]
+      (update client-opts :middleware (fnil conj []) (retry-middleware gen-new-request)))))
 
 
 (comment
