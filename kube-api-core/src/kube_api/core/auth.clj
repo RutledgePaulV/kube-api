@@ -14,7 +14,7 @@
 (defmulti inject-client-auth #'dispatch-fn)
 
 (defn kubeconfig-dir []
-  (let [file ^File (first (kubeconfig/kubeconfig-files))]
+  (when-some [file ^File (first (kubeconfig/kubeconfig-files))]
     (.getParentFile file)))
 
 (defn should-retry? [request response]
@@ -59,10 +59,13 @@
   (let [holder (atom nil)]
     (letfn [(run []
               (let [full-command (into [command] args)
-                    sh-arguments (-> full-command
-                                     (conj :dir (kubeconfig-dir))
-                                     (conj :out-enc :bytes)
-                                     (conj :env (into {} (map (juxt :name :value)) env)))
+                    directory    (kubeconfig-dir)
+                    sh-arguments (cond-> full-command
+                                   (some? directory) (conj :dir directory)
+                                   :always
+                                   (conj :out-enc :bytes)
+                                   :always
+                                   (conj :env (into {} (map (juxt :name :value)) env)))
                     {:keys [out err exit]} (apply sh/sh sh-arguments)]
                 (if (zero? exit)
                   (let [data (muun/decode "application/json" out)
