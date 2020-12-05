@@ -1,101 +1,49 @@
 (ns kube-api.core.auth
-  (:require [clojure.string :as strings]
-            [clj-yaml.core :as yaml]
-            [clojure.java.io :as io]
-            [kube-api.core.utils :as utils]
-            [malli.util :as mu])
-  (:import [java.io File]))
+  (:require [kube-api.core.schemas :as schemas]
+            [kube-api.core.utils :as utils]))
 
-(defn readable? [^File f]
-  (and (.exists f) (.canRead f)))
+(defn dispatch-fn [client-opts user]
+  (utils/dispatch-key schemas/user-schema user))
 
-(defn kubeconfig-files []
-  (let [home (System/getProperty "user.home")
-        csv  (or (System/getenv "KUBECONFIG") "~/.kube/config")]
-    (->> (strings/split csv #",")
-         (remove strings/blank?)
-         (map #(strings/replace % #"^~" home))
-         (map io/file)
-         (filter readable?))))
+(defmulti inject-client-auth #'dispatch-fn)
 
-(defn get-merged-kubeconfig []
-  (->> (kubeconfig-files)
-       (map slurp)
-       (map yaml/parse-string)
-       (apply utils/merge+)))
+(defn req-xf->mw [transformer]
+  (fn [handler]
+    (fn
+      ([request] (handler (transformer request)))
+      ([request respond raise] (handler (transformer request) respond raise)))))
 
-(defn service-account []
-  (let [namespace    (io/file "/run/secrets/kubernetes.io/serviceaccount/namespace")
-        ca-cert      (io/file "/run/secrets/kubernetes.io/serviceaccount/ca.crt")
-        token        (io/file "/run/secrets/kubernetes.io/serviceaccount/token")
-        service-host (System/getenv "KUBERNETES_SERVICE_HOST")
-        service-port (System/getenv "KUBERNETES_SERVICE_PORT_HTTPS")]
-    (when (and (readable? namespace) (readable? ca-cert) (readable? token)
-               (not (strings/blank? service-host)) (not (strings/blank? service-port)))
-      (let [token      (slurp token)
-            namespace  (slurp namespace)
-            ca-cert    (slurp ca-cert)
-            endpoint   (cond-> (str "https://" service-host)
-                         (not= service-port "443") (str ":" service-port))]
-        {:user      {:token token}
-         :cluster   {:certificate-authority-data ca-cert
-                     :server                     endpoint}
-         :namespace namespace}))))
+(defmethod inject-client-auth :basic-auth [client-opts {:keys [username password]}]
+  (letfn [(prepare-request [request]
+            (assoc request :basic-auth [username password]))]
+    (update client-opts :middleware (fnil conj []) (req-xf->mw prepare-request))))
 
-(defn select-context
-  ([context-name]
-   (select-context (get-merged-kubeconfig) context-name))
-  ([kubeconfig context-name]
-   (let [contexts (utils/index-by :name (:contexts kubeconfig))
-         clusters (utils/index-by :name (:clusters kubeconfig))
-         users    (utils/index-by :name (:users kubeconfig))]
-     (when-some [context (get contexts context-name)]
-       (let [cluster-name (get-in context [:context :cluster])
-             user-name    (get-in context [:context :user])
-             cluster      (get-in clusters [cluster-name :cluster])
-             user         (get-in users [user-name :user])
-             namespace    (or (get-in context [:context :namespace]) "default")]
-         {:user (into {} user) :cluster (into {} cluster) :namespace namespace})))))
+(defmethod inject-client-auth :client-key-auth [client-opts {:keys [client-certificate-data client-key-data]}]
+  (-> client-opts
+      (assoc :client-certificate (utils/base64-decode client-certificate-data))
+      (assoc :client-key (utils/base64-decode client-key-data))))
 
-(defn current-context
-  ([] (current-context (get-merged-kubeconfig)))
-  ([kubeconfig]
-   (select-context kubeconfig (:current-context kubeconfig))))
+(defmethod inject-client-auth :exec-auth [client-opts {{:keys [command args env]} :exec}]
+  (throw (ex-info "Not implemented yet." {})))
 
-(defn get-context []
-  (or (service-account) (current-context)))
+(defmethod inject-client-auth :token-auth [client-opts {:keys [token]}]
+  (letfn [(prepare-request [request]
+            (assoc-in request [:headers "Authorization"] (str "Bearer " token)))]
+    (update client-opts :middleware (fnil conj []) (req-xf->mw prepare-request))))
 
-(def base-user-schema
-  [:map
-   [:client-key-data {:optional true} :string]
-   [:client-certificate-data {:optional true} :string]])
+(defmethod inject-client-auth :token-file-auth [client-opts {:keys [tokenFile]}]
+  (letfn [(prepare-request [request]
+            (assoc-in request [:headers "Authorization"] (str "Bearer " (slurp tokenFile))))]
+    (update client-opts :middleware (fnil conj []) (req-xf->mw prepare-request))))
 
-(def token-user-schema
-  (mu/merge
-    base-user-schema
-    [:map
-     [:token :string]]))
 
-(def basic-auth-user-schema
-  (mu/merge
-    base-user-schema
-    [:map
-     [:username :string]
-     [:password :string]]))
+(comment
 
-(def user-schema
-  [:or
-   base-user-schema
-   token-user-schema
-   basic-auth-user-schema])
+  (((first (:middleware
+             (inject-client-auth
+               {}
+               {:username "paul"
+                :password "hehehe"})))
+    (fn [request] request)) {})
 
-(def cluster-schema
-  [:map
-   [:server :string]
-   [:certificate-authority-data {:optional true} :string]])
-
-(def context-schema
-  [:map
-   [:user user-schema]
-   [:cluster cluster-schema]
-   [:namespace {:optional true} :string]])
+  )

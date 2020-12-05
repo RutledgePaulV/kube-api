@@ -7,7 +7,8 @@
             [malli.util :as mu]
             [malli.transform :as mt])
   (:import [java.util.regex Pattern]
-           [clojure.lang IPending]))
+           [clojure.lang IPending IObj]
+           [java.util Base64]))
 
 
 (defn map-vals
@@ -120,3 +121,33 @@
                          (assoc %1 (keyword %2) match)
                          %1)
                       {})))))
+
+(defn base64-decode [^String s]
+  (try
+    (base64-decode
+      (when-not (strings/blank? s)
+        (String. (.decode (Base64/getDecoder) s))))
+    (catch Exception e
+      s)))
+
+(def schema-resolver-transformer
+  (mt/transformer
+    {:default-decoder
+     {:compile (fn [schema _]
+                 (fn [value]
+                   (if (instance? IObj value)
+                     (vary-meta value assoc :resolved schema)
+                     value)))}}))
+
+(def decoder-factory
+  (memoize (fn [schema] (m/decoder schema schema-resolver-transformer))))
+
+(defn resolve-schema [schema value]
+  (some->
+    (if-some [transform (decoder-factory schema)]
+      (some-> value transform meta :resolved)
+      value)))
+
+(defn dispatch-key [schema value]
+  (let [schema (resolve-schema schema value)]
+    (:dispatch-key (m/properties schema))))

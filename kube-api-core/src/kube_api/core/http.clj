@@ -1,11 +1,11 @@
 (ns kube-api.core.http
-  (:require [clojure.string :as strings]
-            [kube-api.core.utils :as utils]
-            [clj-okhttp.core :as http])
+  (:require [kube-api.core.utils :as utils]
+            [clj-okhttp.core :as http]
+            [kube-api.core.auth :as auth]
+            [clojure.string :as strings])
   (:import [okhttp3 OkHttpClient]
            [java.io FilterInputStream InputStream]
-           [clojure.lang IObj]
-           [java.util Base64]))
+           [clojure.lang IObj]))
 
 (defprotocol IntoIObj
   (into-i-obj [this] "Turns object into something that supports metadata."))
@@ -24,25 +24,14 @@
           (vreset! metadata meta)
           this)))))
 
-
-(defn wrap-prepare-request [handler auth-config]
-  (let [token    (get-in auth-config [:user :token])
-        server   (get-in auth-config [:cluster :server])
-        username (get-in auth-config [:user :username])
-        password (get-in auth-config [:user :password])]
-    (letfn [(prepare-request [request]
-              (cond-> request
-                (not (strings/blank? token))
-                (assoc-in [:headers "Authorization"] (str "Bearer " token))
-                (and (not (strings/blank? username)) (not (strings/blank? password)))
-                (assoc :basic-auth [username password])
-                :always
-                (update :url #(utils/join-segment server %))))]
-      (fn prepare-request-handler
-        ([request]
-         (handler (prepare-request request)))
-        ([request respond raise]
-         (handler (prepare-request request) respond raise))))))
+(defn wrap-prepare-request [handler server]
+  (letfn [(prepare-request [request]
+            (update request :url #(utils/join-segment server %)))]
+    (fn prepare-request-handler
+      ([request]
+       (handler (prepare-request request)))
+      ([request respond raise]
+       (handler (prepare-request request) respond raise)))))
 
 (defn wrap-prepare-response [handler]
   (letfn [(prepare-response [{:keys [body] :as response}]
@@ -55,18 +44,19 @@
       ([request respond raise]
        (handler request (comp respond prepare-response) raise)))))
 
-(defn base64-decode [^String s]
-  (when-not (strings/blank? s)
-    (String. (.decode (Base64/getDecoder) s))))
-
 (defn make-http-client
   "Creates a new http client prepared to make authenticated requests to the selected cluster."
   [context]
-  (http/create-client
-    {:server-certificates (base64-decode (get-in context [:cluster :certificate-authority-data]))
-     :client-certificate  (base64-decode (get-in context [:user :client-certificate-data]))
-     :client-key          (base64-decode (get-in context [:user :client-key-data]))
-     :middleware          [wrap-prepare-response #(wrap-prepare-request % context)]}))
+  (let [server    (get-in context [:cluster :server])
+        user      (get-in context [:user])
+        server-ca (get-in context [:cluster :certificate-authority-data])]
+    (cond-> {:middleware [wrap-prepare-response #(wrap-prepare-request % server)]}
+      (not (strings/blank? server-ca))
+      (assoc :server-certificates [(utils/base64-decode server-ca)])
+      :always
+      (auth/inject-client-auth user)
+      :always
+      (http/create-client))))
 
 
 (defn without-read-timeout [^OkHttpClient client]

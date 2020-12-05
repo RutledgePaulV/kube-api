@@ -2,9 +2,10 @@
   "The 'small core' of kube-api. Lets you invoke API operations."
   (:require [clj-okhttp.core :as http]
             [kube-api.core.utils :as utils]
-            [kube-api.core.auth :as auth]
+            [kube-api.core.kubeconfig :as kubeconfig]
             [kube-api.core.swagger.kubernetes :as swag]
             [kube-api.core.http :as kube-http]
+            [kube-api.core.schemas :as schemas]
             [malli.generator :as gen]
             [clojure.tools.logging :as log])
   (:import [okhttp3 Response WebSocket]
@@ -46,16 +47,16 @@
    context - a string name of the context to select or else a map containing connection information
 
    "
-  ([] (create-client (auth/get-context)))
+  ([] (create-client (kubeconfig/current-context)))
   ([context]
    (cond
      ; handled an entire kubeconfig
      (and (map? context) (contains? context :contexts))
-     (recur (auth/current-context context))
+     (recur (kubeconfig/current-context context))
 
      ; presumably have a selected context, validate it in case
      (map? context)
-     (do (utils/validate! "Invalid context." auth/context-schema (dissoc context :http-client))
+     (do (utils/validate! "Invalid context." schemas/resolved-context-schema (dissoc context :http-client))
          (let [{:keys [http-client] :as full-context}
                (update context :http-client #(or % (kube-http/make-http-client context)))]
            (with-meta full-context
@@ -64,7 +65,7 @@
                {:swagger swagger :operations operations}))))
 
      (or (string? context) (keyword? context))
-     (recur (auth/select-context (name context)))
+     (recur (kubeconfig/select-context (name context)))
 
      :otherwise
      (throw (IllegalArgumentException. "This is not a valid context for building a client.")))))
@@ -240,7 +241,7 @@
 
 (comment
 
-  (def client (create-client "microk8s"))
+  (def client (create-client "do-nyc1-k8s-1-19-3-do-2-nyc1-1604718220356"))
 
   ; getting a pod by name
 

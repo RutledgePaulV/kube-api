@@ -1,7 +1,8 @@
 (ns kube-api.io.io
   "Utilities for working with blocking and non-blocking io."
   (:require [clojure.tools.logging :as log]
-            [muuntaja.core :as muuntaja])
+            [muuntaja.core :as muuntaja]
+            [clojure.stacktrace :as stack])
   (:import [java.io Closeable InputStream OutputStream IOException PipedInputStream PipedOutputStream]
            [java.nio.channels ReadableByteChannel WritableByteChannel]
            [java.util.concurrent.atomic AtomicLong]
