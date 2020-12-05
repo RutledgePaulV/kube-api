@@ -6,8 +6,7 @@
             [clojure.pprint :as pprint]
             [malli.util :as mu]
             [malli.transform :as mt])
-  (:import [java.util.regex Pattern]
-           [clojure.lang IPending IObj]
+  (:import [clojure.lang IPending IObj]
            [java.util Base64]))
 
 
@@ -105,24 +104,6 @@
 
 (defmacro defmethodset [symbol dispatch-keys & body]
   `(doseq [dispatch# ~dispatch-keys] (defmethod ~symbol dispatch# ~@body)))
-
-
-(def ^:private named-groups
-  (let [method
-        (doto (.getDeclaredMethod Pattern "namedGroups" (into-array Class []))
-          (.setAccessible true))]
-    (fn [pattern]
-      (.invoke method pattern (into-array Object [])))))
-
-
-(defn match-groups [re s]
-  (let [matcher (re-matcher re s)]
-    (and (.matches matcher)
-         (->> (keys (named-groups re))
-              (reduce #(if-some [match (.group matcher ^String %2)]
-                         (assoc %1 (keyword %2) match)
-                         %1)
-                      {})))))
 
 (defn base64-decode [^String s]
   (try

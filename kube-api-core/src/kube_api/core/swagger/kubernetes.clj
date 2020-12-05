@@ -75,12 +75,11 @@
 
 (defn most-appropriate-default-version [options]
   (letfn [(version->preference-rank [version]
-            (let [re #"^v(?<major>\d+)(?<minor>[A-Za-z]+)?(?<patch>\d+)?$"]
-              (-> (utils/match-groups re version)
-                  (update :minor #(or % "stable"))
-                  (update :patch #(or % "0"))
-                  (update :major #(Long/parseLong %))
-                  (update :patch #(Long/parseLong %)))))]
+            (let [[_ major minor patch]
+                  (re-find #"^v(\d+)([A-Za-z]+)?(\d+)?$" version)]
+              {:minor (or minor "stable")
+               :major (Long/parseLong major)
+               :patch (Long/parseLong (or patch "0"))}))]
     (let [grouped
           (->> (map (juxt version->preference-rank identity) options)
                (sort-by (comp (juxt :major :patch) first) #(compare %2 %1))

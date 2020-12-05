@@ -29,8 +29,7 @@
     x))
 
 (defn read-kubeconfig [file]
-  (let [data (yaml/parse-string (slurp file))]
-    (update data :contexts (fn [contexts] (mapv #(assoc % :file (.getAbsolutePath %)) contexts)))))
+  (yaml/parse-string (slurp file)))
 
 (defn get-merged-kubeconfig []
   (->> (kubeconfig-files)
