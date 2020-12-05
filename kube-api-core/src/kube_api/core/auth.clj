@@ -21,21 +21,41 @@
   (and (= 401 (:status response))
        (not (instance? InputStream (:body request)))))
 
-(defn retry-middleware [prepare-request]
+(defn retry-middleware
+  "Given a function of two arguments to 'prepare' authentication on a request to execute,
+   return http middleware that will force new authentication in the event of a failure."
+  [prepare-request]
   (fn [handler]
     (fn retry-handler
       ([request]
-       (let [response (handler (prepare-request request false))]
-         (if (should-retry? request response)
-           (handler (prepare-request request true))
-           response)))
+       (let [[forced prepared]
+             (try
+               [false (prepare-request request false)]
+               (catch Exception e
+                 [true (prepare-request request true)]))]
+         (if forced
+           (handler prepared)
+           (let [response (handler prepared)]
+             (if (should-retry? request response)
+               (handler (prepare-request request true))
+               response)))))
       ([request respond raise]
-       (handler (prepare-request request false)
-                (fn [response]
-                  (if (should-retry? request response)
-                    (handler (prepare-request request true) respond raise)
-                    (respond response)))
-                raise)))))
+       (let [[forced prepared]
+             (try
+               [false (prepare-request request false)]
+               (catch Exception e
+                 (try
+                   [true (prepare-request request true)]
+                   (catch Exception e
+                     (raise e)))))]
+         (if forced
+           (handler prepared respond raise)
+           (handler prepared
+                    (fn [response]
+                      (if (should-retry? request response)
+                        (handler (prepare-request request true) respond raise)
+                        (respond response)))
+                    raise)))))))
 
 (defn normal-middleware [prepare-request]
   (fn [handler]
@@ -87,10 +107,7 @@
             (gen-new-request [request force-new]
               (let [new-delay (delay (run))
                     swap-fn   (if force-new
-                                (fn [old]
-                                  (if (and (some? old) (not (realized? old)))
-                                    old
-                                    new-delay))
+                                (fn [old] (if-not (realized? old) old new-delay))
                                 (fn [old]
                                   (cond
                                     (nil? old) new-delay
