@@ -4,8 +4,8 @@
             [clojure.java.io :as io]
             [kube-api.core.utils :as utils]
             [clojure.walk :as walk])
-  (:import [java.io File]
-           [flatland.ordered.map OrderedMap]))
+  (:import [flatland.ordered.map OrderedMap]
+           [java.io File]))
 
 (defn readable? [^File f]
   (and (.exists f) (.canRead f)))
@@ -23,15 +23,18 @@
   (walk/postwalk
     (fn [form]
       (cond
-        (seq? form) (into [] form)
+        (sequential? form) (into [] form)
         (instance? OrderedMap form) (into {} form)
         :otherwise form))
     x))
 
+(defn read-kubeconfig [file]
+  (let [data (yaml/parse-string (slurp file))]
+    (update data :contexts (fn [contexts] (mapv #(assoc % :file (.getAbsolutePath %)) contexts)))))
+
 (defn get-merged-kubeconfig []
   (->> (kubeconfig-files)
-       (map slurp)
-       (map yaml/parse-string)
+       (map read-kubeconfig)
        (apply utils/merge+)
        (normalize)))
 

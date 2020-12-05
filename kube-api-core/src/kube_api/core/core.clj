@@ -13,11 +13,11 @@
 
 
 (defonce validation
-  (atom (delay (not (utils/in-kubernetes?)))))
+  (atom (utils/in-kubernetes?)))
 
 
 (defn- prepare-invoke-request [client op-selector request]
-  (let [validate?             (force (deref validation))
+  (let [validate?             (deref validation)
         {:keys [op-selector-schema] :as views} (-> client (meta) :operations (force))
         defaulted-op-selector (utils/prepare op-selector-schema op-selector)
         _                     (when validate? (utils/validate! "Invalid op selector." op-selector-schema defaulted-op-selector))

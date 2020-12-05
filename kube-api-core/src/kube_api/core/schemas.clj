@@ -18,6 +18,7 @@
     [:map
      [:apiVersion :string]
      [:command :string]
+     [:installHint {:optional true} :string]
      [:args {:optional true}
       [:vector :string]]
      [:env {:optional true}
@@ -61,17 +62,17 @@
    [:current-context :string]
    [:preferences [:map-of :string 'any?]]
    [:clusters
-    [:sequential
+    [:vector
      [:map
       [:name :string]
       [:cluster cluster-schema]]]]
    [:users
-    [:sequential
+    [:vector
      [:map
       [:name :string]
       [:user user-schema]]]]
    [:contexts
-    [:sequential
+    [:vector
      [:map
       [:name :string]
       [:context context-schema]]]]])
@@ -81,6 +82,26 @@
    [:namespace :string]
    [:user user-schema]
    [:cluster cluster-schema]])
+
+(def exec-token-response
+  [:map {:dispatch-key :exec-token-response}
+   [:apiVersion :string]
+   [:kind [:= "ExecCredential"]]
+   [:status [:map
+             [:token :string]
+             [:expirationTimestamp {:optional true} :string]]]])
+
+(def exec-client-key-response
+  [:map {:dispatch-key :exec-client-key-response}
+   [:apiVersion :string]
+   [:kind [:= "ExecCredential"]]
+   [:status [:map
+             [:clientKeyData :string]
+             [:clientCertificateData :string]
+             [:expirationTimestamp {:optional true} :string]]]])
+
+(def exec-response
+  [:or exec-token-response exec-client-key-response])
 
 (comment
   (m/validate

@@ -34,15 +34,15 @@
        (handler (prepare-request request) respond raise)))))
 
 (defn wrap-prepare-response [handler]
-  (letfn [(prepare-response [{:keys [body] :as response}]
-            (let [metadata (meta response)]
+  (letfn [(prepare-response [request {:keys [body] :as response}]
+            (let [metadata {:request request :response response}]
               (if (satisfies? IntoIObj body)
                 (with-meta (into-i-obj body) metadata)
                 response)))]
     (fn prepare-response-handler
-      ([request] (prepare-response (handler request)))
+      ([request] (prepare-response request (handler request)))
       ([request respond raise]
-       (handler request (comp respond prepare-response) raise)))))
+       (handler request (comp respond (partial prepare-response request)) raise)))))
 
 (defn make-http-client
   "Creates a new http client prepared to make authenticated requests to the selected cluster."
@@ -50,11 +50,13 @@
   (let [server    (get-in context [:cluster :server])
         user      (get-in context [:user])
         server-ca (get-in context [:cluster :certificate-authority-data])]
-    (cond-> {:middleware [wrap-prepare-response #(wrap-prepare-request % server)]}
+    (cond-> {:middleware [#(wrap-prepare-request % server)]}
       (not (strings/blank? server-ca))
       (assoc :server-certificates [(utils/base64-decode server-ca)])
-      :always
+      (not-empty user)
       (auth/inject-client-auth user)
+      :always
+      (update :middleware (fnil conj []) wrap-prepare-response)
       :always
       (http/create-client))))
 
