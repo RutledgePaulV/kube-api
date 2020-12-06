@@ -107,12 +107,17 @@
             (gen-new-request [request force-new]
               (let [new-delay (delay (run))
                     swap-fn   (if force-new
-                                (fn [old] (if-not (realized? old) old new-delay))
+                                (fn [old]
+                                  (if (and (some? old) (not (realized? old)))
+                                    old
+                                    new-delay))
                                 (fn [old]
                                   (cond
                                     (nil? old) new-delay
                                     (not (realized? old)) old
-                                    (stale? old) new-delay
+                                    (try
+                                      (stale? (force old))
+                                      (catch Exception e true)) new-delay
                                     :otherwise old)))
                     [kind data] (force (swap! state swap-fn))]
                 (case kind
@@ -133,7 +138,10 @@
               (let [new-delay (delay (slurp tokenFile))
                     swap-fn   (if force-new
                                 ; swap it out unless a new one is already pending
-                                (fn [old] (if-not (realized? old) old new-delay))
+                                (fn [old]
+                                  (if (and (some? old) (not (realized? old)))
+                                    old
+                                    new-delay))
                                 ; swap it out only if it's not been set yet
                                 #(or % new-delay))
                     new-token (force (swap! state swap-fn))]

@@ -138,6 +138,44 @@
 (defmethod swagger->malli* "boolean" [node context registry]
   [registry :boolean])
 
+; kubernetes specific extensions because these swagger specs are insufficiently
+; described to be automatically interpreted. because specs are best when they're
+; only implemented 90% of the way, right?
+
+(utils/defmethodset swagger->malli*
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON
+    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON}
+  [_ context registry]
+  (let [definition [:or :bool :int :double :string [:vector [:ref ::json]] [:map-of :string [:ref ::json]]]]
+    [(merge registry {:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON definition})
+     [:ref :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON]]))
+
+(utils/defmethodset swagger->malli*
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool
+    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool}
+  [_ context registry]
+  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
+        [child-registry child] (*recurse* json-schema-props context registry)]
+    [child-registry [:or {:default true} child :boolean]]))
+
+(utils/defmethodset swagger->malli*
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray
+    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrArray}
+  [_ context registry]
+  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
+        [child-registry child] (*recurse* json-schema-props context registry)]
+    [child-registry [:or child [:vector child]]]))
+
+(utils/defmethodset swagger->malli*
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray
+    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray}
+  [_ context registry]
+  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
+        [child-registry child] (*recurse* json-schema-props context registry)]
+    [child-registry [:or child [:vector :string]]]))
+
+
+
 (defn swagger->malli
   "How you exchange a swagger specification for a malli schema. Must specify
    the 'root' chunk of swagger spec that you want to convert into a schema."

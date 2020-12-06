@@ -3,7 +3,7 @@
   (:require [clj-okhttp.core :as http]
             [kube-api.core.utils :as utils]
             [kube-api.core.kubeconfig :as kubeconfig]
-            [kube-api.core.swagger.kubernetes :as swag]
+            [kube-api.core.operations :as operations]
             [kube-api.core.http :as kube-http]
             [kube-api.core.schemas :as schemas]
             [malli.generator :as gen]
@@ -21,7 +21,7 @@
         {:keys [op-selector-schema] :as views} (-> client (meta) :operations (force))
         defaulted-op-selector (utils/prepare op-selector-schema op-selector)
         _                     (when validate? (utils/validate! "Invalid op selector." op-selector-schema defaulted-op-selector))
-        {:keys [uri request-method request-schema]} (swag/get-op views defaulted-op-selector)
+        {:keys [uri request-method request-schema]} (operations/get-op views defaulted-op-selector)
         defaulted-request     (utils/prepare request-schema request)
         _                     (when validate? (utils/validate! "Invalid request." request-schema defaulted-request))]
     (let [rendered-uri (utils/render-template-string uri (get-in defaulted-request [:path-params]))]
@@ -61,7 +61,7 @@
                (update context :http-client #(or % (kube-http/make-http-client context)))]
            (with-meta full-context
              (let [swagger    (delay (http/get http-client "/openapi/v2" {:as :json}))
-                   operations (delay (swag/kube-swagger->operation-views (deref swagger)))]
+                   operations (delay (operations/kube-swagger->operation-views (deref swagger)))]
                {:swagger swagger :operations operations}))))
 
      (or (string? context) (keyword? context))
@@ -106,7 +106,7 @@
         schema    (:op-selector-schema views)
         validator (utils/validator-factory schema)]
     (if (validator op-selector)
-      (swag/get-op views op-selector)
+      (operations/get-op views op-selector)
       (utils/validation-error "Invalid op selector." schema op-selector))))
 
 

@@ -1,49 +1,12 @@
-(ns kube-api.core.swagger.kubernetes
-  "Kubernetes specific code for producing operation specifications."
+(ns kube-api.core.operations
+  "Code for producing operation specifications from swagger input."
   (:require [kube-api.core.swagger.swagger :as swagger]
-            [kube-api.core.swagger.malli :as malli]
             [kube-api.core.utils :as utils]
             [clojure.set :as sets]
             [clojure.java.io :as io]
             [clojure.edn :as edn]
             [clojure.string :as strings]))
 
-
-; kubernetes specific extensions because these swagger specs are insufficiently
-; described to be automatically interpreted. because specs are best when they're
-; only implemented 90% of the way, right?
-
-(utils/defmethodset malli/swagger->malli*
-  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON
-    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON}
-  [_ context registry]
-  (let [definition [:or :bool :int :double :string [:vector [:ref ::json]] [:map-of :string [:ref ::json]]]]
-    [(merge registry {:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON definition})
-     [:ref :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON]]))
-
-(utils/defmethodset malli/swagger->malli*
-  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool
-    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool}
-  [_ context registry]
-  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
-        [child-registry child] (malli/*recurse* json-schema-props context registry)]
-    [child-registry [:or {:default true} child :boolean]]))
-
-(utils/defmethodset malli/swagger->malli*
-  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray
-    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrArray}
-  [_ context registry]
-  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
-        [child-registry child] (malli/*recurse* json-schema-props context registry)]
-    [child-registry [:or child [:vector child]]]))
-
-(utils/defmethodset malli/swagger->malli*
-  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray
-    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray}
-  [_ context registry]
-  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
-        [child-registry child] (malli/*recurse* json-schema-props context registry)]
-    [child-registry [:or child [:vector :string]]]))
 
 (defn kubernetes-group-version-kind [op]
   (get-in op [:custom-attributes :x-kubernetes-group-version-kind]))
