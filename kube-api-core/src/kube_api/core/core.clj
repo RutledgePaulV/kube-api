@@ -28,8 +28,9 @@
       (cond-> {:request-method request-method :url rendered-uri}
         (not-empty (:query-params defaulted-request))
         (assoc :query-params (:query-params defaulted-request))
-        (not-empty (:body-params defaulted-request))
-        (assoc :form-params (:body-params defaulted-request))))))
+        (not-empty (:body defaulted-request))
+        (-> (assoc :body (:body defaulted-request))
+            (assoc-in [:headers "Content-Type"] "application/json"))))))
 
 
 (defn set-validation!

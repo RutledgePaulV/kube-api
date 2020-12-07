@@ -45,3 +45,14 @@
       (is (not-empty (:items results)))
       (is (m/validate success-schema results)))))
 
+(deftest creation-test
+  (testing "i can create a namespace"
+    (let [op-selector {:action "create" :kind "Namespace"}
+          ns-name     (name (gensym "test-namespace"))
+          request     {:body
+                       {:apiVersion "v1"
+                        :kind       "Namespace"
+                        :metadata   {:name ns-name}}}
+          response    (kube/invoke (force test-client) op-selector request)]
+      (is (= 201 (-> response meta :response :status)))
+      (is (= ns-name (get-in response [:metadata :name]))))))

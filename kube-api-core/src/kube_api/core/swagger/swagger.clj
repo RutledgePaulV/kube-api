@@ -3,7 +3,8 @@
    described as data using malli schemas for requests and responses."
   (:require [kube-api.core.swagger.malli :as malli]
             [clojure.string :as strings]
-            [kube-api.core.utils :as utils]))
+            [kube-api.core.utils :as utils]
+            [malli.util :as mu]))
 
 
 (defn compile-request-schema [swagger-spec params]
@@ -29,8 +30,7 @@
         (conj [:query-params {:optional (every? (complement :required) query)}
                (into [:map] (map compile-one) query)])
         (not-empty body)
-        (conj [:body-params {:optional (every? (complement :required) body)}
-               (into [:map] (map compile-one) body)])
+        (conj (compile-one (first body)))
         (not-empty path)
         (conj [:path-params {:optional (every? (complement :required) path)}
                (into [:map] (map compile-one) path)])))))
