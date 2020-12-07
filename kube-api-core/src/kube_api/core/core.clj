@@ -171,10 +171,7 @@
    raise       - an error callback function if you want to invoke asynchronously.
   "
   ([client op-selector]
-   (invoke client op-selector
-           {:body-params  {}
-            :query-params {}
-            :path-params  {:namespace (or (get client :namespace) "default")}}))
+   (invoke client op-selector {}))
   ([{:keys [http-client] :as client} op-selector request]
    (let [final-request (prepare-invoke-request client op-selector request)]
      (http/request* http-client final-request)))
@@ -243,12 +240,11 @@
 
   (def client (create-client "do-nyc1-k8s-1-19-3-do-2-nyc1-1604718220356"))
 
-  ; getting a pod by name
+  ; listing pods
 
   (invoke client
-          {:operation "get" :kind "Pod"}
-          {:path-params {:namespace "kube-system"
-                         :name      "kube-proxy-p6mm5"}})
+          {:action "list" :kind "Pod"}
+          {:path-params {:namespace "kube-system"}})
 
   ; watching changes to deployments in the kube-system namespace
   (connect client
@@ -267,7 +263,6 @@
                               {:namespace "kube-system"
                                :name      "kube-proxy-p6mm5"}}))
 
-  (with-open [reader (clojure.java.io/reader stream)]
-    (while true (println (.readLine reader))))
+  (slurp stream)
 
   )

@@ -55,6 +55,15 @@
 (defn most-appropriate-group [options]
   (if (contains? (set options) "") "" (first (sort options))))
 
+(defn most-appropriate-operation [operations]
+  (if (= 1 (count operations))
+    (first operations)
+    (let [filtered
+          (->> operations
+               (remove #(re-find #"(?i)ForAllNamespaces" %))
+               (remove #(re-find #"Status$" %)))]
+      (when (= 1 (count filtered)) (first filtered)))))
+
 (def modifications
   (delay (edn/read-string (slurp (io/resource "kube_api/swagger-overlay.edn")))))
 
@@ -114,22 +123,21 @@
     nil
     indexes))
 
+(defn narrow [views selector]
+  (index (select views selector)))
+
 (defn get-op [views selector]
-  (let [; perform one select to narrow the available options
-        remainder  (select views selector)
-        ; index the narrowed results
-        views'     (index remainder)
-        ; refine the selector by picking the best group/version of the remainder
-        ; if group and version were unset
-        selector'  (-> selector
-                       (update :group #(or % (most-appropriate-group (keys (:by-group views')))))
-                       (update :version #(or % (most-appropriate-default-version (keys (:by-version views'))))))
-        ; perform another selection
-        remainder' (select views' selector')]
+  (let [views'      (narrow views selector)
+        selector'   (update selector :version #(or % (most-appropriate-default-version (keys (:by-version views')))))
+        views''     (narrow views' selector')
+        selector''  (update selector' :group #(or % (most-appropriate-group (keys (:by-group views'')))))
+        views'''    (narrow views'' selector'')
+        selector''' (update selector'' :operation #(or % (most-appropriate-operation (keys (:by-operation views''')))))
+        remainder   (select views''' selector''')]
     (cond
-      (empty? remainder')
+      (empty? remainder)
       (throw (ex-info "op-selector didn't match an available operation" {:selector selector}))
-      (< 1 (count remainder'))
+      (< 1 (count remainder))
       (throw (ex-info "op-selector not specific enough to identify operation" {:selector selector}))
       :otherwise
-      (first remainder'))))
+      (first remainder))))
