@@ -3,8 +3,7 @@
    described as data using malli schemas for requests and responses."
   (:require [kube-api.core.swagger.malli :as malli]
             [clojure.string :as strings]
-            [kube-api.core.utils :as utils]
-            [malli.util :as mu]))
+            [kube-api.core.utils :as utils]))
 
 
 (defn compile-request-schema [swagger-spec params]

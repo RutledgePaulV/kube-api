@@ -1,4 +1,5 @@
-[![Build Status](https://travis-ci.com/rutledgepaulv/kube-api.svg?branch=master)](https://travis-ci.com/rutledgepaulv/kube-api)
+![Build Status](https://img.shields.io/travis/com/rutledgepaulv/kube-api?style=for-the-badge)
+[![Discuss on Slack](https://img.shields.io/badge/slack-clojurians%20%23kube--api-4A154B?logo=slack&style=for-the-badge)](https://clojurians.slack.com/channels/kube-api)
 
 ## What
 
@@ -17,17 +18,13 @@ has been my primary reference when implementing the trickier pieces of IO.
 
 ## Modules
 
-### kube-api/kube-api
-
-[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api.svg)](https://clojars.org/kube-api/kube-api)
+![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api?style=for-the-badge)
 
 This module bundles all modules (described below) for ease of use.
 
 ---
 
-### kube-api/kube-api-core
-
-[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-core.svg)](https://clojars.org/kube-api/kube-api-core)
+![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-core?style=for-the-badge)
 
 [View code examples](./kube-api-core)
 
@@ -52,9 +49,7 @@ Leverages:
 
 ---
 
-### kube-api/kube-api-io
-
-[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-io.svg)](https://clojars.org/kube-api/kube-api-io)
+![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-io?style=for-the-badge)
 
 [View code examples](./kube-api-io)
 
@@ -67,9 +62,7 @@ Leverages:
 
 ---
 
-### kube-api/kube-api-controllers
-
-[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-controllers.svg)](https://clojars.org/kube-api/kube-api-controllers)
+![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-controllers?style=for-the-badge)
 
 [View code examples](./kube-api-controllers)
 
@@ -85,11 +78,9 @@ Leverages:
 
 - [core.async](https://github.com/clojure/core.async)
 
---- 
+---
 
-### kube-api/kube-api-term
-
-[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-term.svg)](https://clojars.org/kube-api/kube-api-term)
+![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-term?style=for-the-badge)
 
 [View code examples](./kube-api-term)
 
@@ -102,9 +93,7 @@ Leverages:
 
 ---
 
-### kube-api/kube-api-ring
-
-[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-ring.svg)](https://clojars.org/kube-api/kube-api-ring)
+![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-ring?style=for-the-badge)
 
 [View code examples](./kube-api-ring)
 
@@ -113,9 +102,7 @@ authentication within a Kubernetes cluster (so long as the traffic originates fr
 
 ---
 
-### kube-api/kube-api-test
-
-[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-test.svg)](https://clojars.org/kube-api/kube-api-test)
+![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-test?style=for-the-badge)
 
 [View code examples](./kube-api-test)
 
