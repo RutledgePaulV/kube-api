@@ -3,8 +3,8 @@
   (:require [clojure.tools.logging :as log]
             [muuntaja.core :as muuntaja]
             [clojure.stacktrace :as stack])
-  (:import [java.io Closeable InputStream OutputStream IOException PipedInputStream PipedOutputStream]
-           [java.nio.channels ReadableByteChannel WritableByteChannel]
+  (:import [java.io Closeable InputStream OutputStream IOException PipedInputStream PipedOutputStream InterruptedIOException]
+           [java.nio.channels ReadableByteChannel WritableByteChannel AsynchronousCloseException]
            [java.util.concurrent.atomic AtomicLong]
            [java.util.concurrent Executors ThreadFactory Future ThreadPoolExecutor]
            [java.nio ByteBuffer]
@@ -13,28 +13,6 @@
            [java.nio.charset Charset]
            [okhttp3 Call WebSocket]))
 
-
-(defmacro try-root
-  "Used just like the special form try, except pulls out the root
-   cause and catches on that instead of whatever exception might
-   wrap it. Useful for catching exceptions surrounding futures and
-   the like."
-  [& body]
-  (letfn [(form? [form]
-            (and (or (seq? form) (list? form)) (symbol? (first form))))
-          (catch-form? [form]
-            (and (form? form) (= 'catch (first form))))
-          (finally-form? [form]
-            (and (form? form) (= 'finally (first form))))
-          (tail? [form]
-            (or (catch-form? form) (finally-form? form)))]
-    (let [[inner-body remainder]
-          (split-with (complement tail?) body)]
-      `(try
-         (try ~@inner-body
-              (catch Throwable e#
-                (throw (stack/root-cause e#))))
-         ~@remainder))))
 
 (defprotocol Close
   (close [this]))
@@ -137,26 +115,33 @@
     (if-not (interrupted?)
       (when-some [read (try
                          (.read stream buffer)
+                         (catch InterruptedIOException e
+                           (on-close))
                          (catch IOException e
                            (when-not (interrupted?)
                              (log/error e "Unexpected exception while reading from source."))
                            (on-close)
                            nil))]
-        (if-not (neg? read)
-          (do
-            (when (pos? read)
-              (let [bites (byte-array (+ read (count flags)))]
-                (dotimes [idx (count flags)]
-                  (aset bites idx (byte (nth flags idx))))
-                (System/arraycopy buffer 0 bites (count flags) read)
-                (try
-                  (on-bytes bites)
-                  (catch Exception e
-                    (log/error e "Exception using bytes from source.")))))
+        (cond
+          (zero? read)
+          (if (pos? (.available stream))
+            (recur buffer)
+            (do (Thread/sleep sleep) (recur buffer)))
+
+          (pos? read)
+          (let [bites (byte-array (+ read (count flags)))]
+            (dotimes [idx (count flags)]
+              (aset bites idx (byte (nth flags idx))))
+            (System/arraycopy buffer 0 bites (count flags) read)
+            (try
+              (on-bytes bites)
+              (catch Exception e
+                (log/error e "Exception using bytes from source.")))
             (if (pos? (.available stream))
               (recur buffer)
-              (do (Thread/sleep sleep)
-                  (recur buffer))))
+              (do (Thread/sleep sleep) (recur buffer))))
+
+          (neg? read)
           (on-close)))
       (on-close))))
 
@@ -168,39 +153,47 @@
           (when-some
             [read (try
                     (.read source buffer)
+                    (catch AsynchronousCloseException e
+                      nil)
                     (catch Exception e
                       (when-not (interrupted?)
                         (log/error e "Unexpected exception while reading from source."))
-                      (when (interrupted?) (uninterrupt))
+                      (when (interrupted?)
+                        (uninterrupt))
                       (on-close)
                       nil))]
-            (when (pos? read)
-              (.flip buffer)
-              (let [bites (byte-array (.remaining buffer))]
-                (.get buffer bites)
-                (try
-                  (on-bytes bites)
-                  (catch Exception e
-                    (log/error e "Exception using bytes from source.")))))
-            (if (neg? read)
-              (on-close)
-              (do (when (zero? read)
-                    (Thread/sleep sleep))
-                  (recur (.clear buffer))))))
+            (cond
+
+              (nil? read)
+              nil
+
+              (zero? read)
+              (do
+                (Thread/sleep sleep)
+                (recur (.clear buffer)))
+
+              (pos? read)
+              (do (.flip buffer)
+                  (let [bites (byte-array (.remaining buffer))]
+                    (.get buffer bites)
+                    (try
+                      (on-bytes bites)
+                      (catch Exception e
+                        (log/error e "Exception using bytes from source."))))
+                  (recur (.clear buffer)))
+
+              (neg? read)
+              (on-close))))
+
       (do (uninterrupt) (on-close)))))
 
 
-(defn pump ^Future [source on-bytes on-close
-                    {:keys [flags sleep buffer-size]
-                     :or   {flags       []
-                            sleep       50
-                            buffer-size 4096}
-                     :as   options}]
-  (let [task
-        (fn pump-task []
-          (if (non-blocking-io? source)
-            (pump-non-blocking-io source on-bytes on-close options)
-            (pump-classic-io source on-bytes on-close options)))]
+(defn pump ^Future [source on-bytes on-close {:keys [flags sleep buffer-size] :as options}]
+  (let [final-options (merge {:flags [] :sleep 50 :buffer-size 4096} options)
+        task          (fn pump-task []
+                        (if (non-blocking-io? source)
+                          (pump-non-blocking-io source on-bytes on-close final-options)
+                          (pump-classic-io source on-bytes on-close final-options)))]
     (.submit executor ^Runnable task)))
 
 
