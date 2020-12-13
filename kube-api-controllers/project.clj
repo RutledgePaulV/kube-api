@@ -30,7 +30,8 @@
 
   :profiles
   {:dev {:dependencies [[lambdaisland/deep-diff2 "2.0.108"]
-                        [kube-api/kube-api-test "0.1.0-SNAPSHOT"]]}}
+                        [kube-api/kube-api-test "0.1.0-SNAPSHOT"]
+                        [org.slf4j/slf4j-simple "1.7.30"]]}}
 
   :repl-options
   {:init-ns kube-api.controllers.controllers})

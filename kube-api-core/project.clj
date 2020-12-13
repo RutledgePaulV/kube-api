@@ -42,4 +42,5 @@
   :profiles
   {:dev {:resource-paths ["testfiles"]
          :dependencies   [[com.gfredericks/test.chuck "0.2.10"]
-                          [kube-api/kube-api-test "0.1.0-SNAPSHOT"]]}})
+                          [kube-api/kube-api-test "0.1.0-SNAPSHOT"]
+                          [org.slf4j/slf4j-simple "1.7.30"]]}})

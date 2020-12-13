@@ -36,7 +36,8 @@
    [log4j/log4j "1.2.17"]]
 
   :profiles
-  {:dev {:dependencies [[kube-api/kube-api-test "0.1.0-SNAPSHOT"]]}}
+  {:dev {:dependencies [[kube-api/kube-api-test "0.1.0-SNAPSHOT"]
+                        [org.slf4j/slf4j-simple "1.7.30"]]}}
 
   :repl-options
   {:init-ns kube-api.term.core})

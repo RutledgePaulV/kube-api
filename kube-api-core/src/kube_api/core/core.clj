@@ -40,6 +40,10 @@
   [true-or-false]
   (reset! validation true-or-false))
 
+(defn contexts
+  "Lists the available kubernetes contexts from your merged kubeconfig."
+  []
+  (->> (kubeconfig/get-merged-kubeconfig) (:contexts) (map :name) (into (sorted-set))))
 
 (defn create-client
   "Create a client instance. Optionally provide the name of a kubectl context

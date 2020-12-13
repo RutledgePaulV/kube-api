@@ -30,7 +30,8 @@
    [org.clojars.rutledgepaulv/ring-firewall-middleware "0.1.5"]]
 
   :profiles
-  {:dev {:dependencies [[kube-api/kube-api-test "0.1.0-SNAPSHOT"]]}}
+  {:dev {:dependencies [[kube-api/kube-api-test "0.1.0-SNAPSHOT"]
+                        [org.slf4j/slf4j-simple "1.7.30"]]}}
 
   :repl-options
   {:init-ns kube-api.ring.core})
