@@ -57,16 +57,17 @@
   (throw (ex-info "Undefined conversion! Teach me." {:node node})))
 
 (defmethod swagger->malli* "$ref" [node context registry]
-  (let [pointer    (get node :$ref)
-        path       (utils/pointer->path pointer)
-        definition (get-in context path)
-        identifier (peek path)]
-    (if (contains? registry identifier)
-      (do (when (utils/promise? (get registry identifier))
-            (deliver (get registry identifier) true))
-          [registry [:ref identifier]])
+  (let [pointer       (get node :$ref)
+        path          (utils/pointer->path pointer)
+        definition    (get-in context path)
+        identifier    (peek path)
+        registry-name (name identifier)]
+    (if (contains? registry registry-name)
+      (do (when (utils/promise? (get registry registry-name))
+            (deliver (get registry registry-name) true))
+          [registry [:ref registry-name]])
       (let [prom           (promise)
-            new-registry   (assoc registry identifier prom)
+            new-registry   (assoc registry registry-name prom)
             method         (get-method swagger->malli* identifier)
             default-method (get-method swagger->malli* :default)
             [child-reg child]
@@ -74,8 +75,8 @@
               (method identifier context new-registry)
               (*recurse* definition context new-registry))]
         (if (realized? prom)
-          [(update child-reg identifier #(if (utils/promise? %1) child (or %1 child))) [:ref identifier]]
-          [(if-not (utils/promise? (get child-reg identifier)) child-reg (dissoc child-reg identifier)) child])))))
+          [(update child-reg registry-name #(if (utils/promise? %1) child (or %1 child))) [:ref registry-name]]
+          [(if-not (utils/promise? (get child-reg registry-name)) child-reg (dissoc child-reg registry-name)) child])))))
 
 (defmethod swagger->malli* "array" [node context registry]
   (let [[child-registry child] (*recurse* (:items node) context registry)]
@@ -146,9 +147,12 @@
   #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON
     :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON}
   [_ context registry]
-  (let [definition [:or :bool :int :double :string [:vector [:ref ::json]] [:map-of :string [:ref ::json]]]]
-    [(merge registry {:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON definition})
-     [:ref :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON]]))
+  (let [definition
+        [:or :boolean :int :double :string
+         [:vector [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"]]
+         [:map-of :string [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"]]]]
+    [(merge registry {"io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON" definition})
+     [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"]]))
 
 (utils/defmethodset swagger->malli*
   #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool

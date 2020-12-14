@@ -8,7 +8,7 @@
 (defonce test-kubeconfig
   (delay (test/get-or-init-test-cluster "kube-api-core")))
 
-(defonce test-client
+(def test-client
   (delay (kube/create-client (force test-kubeconfig))))
 
 (defn random-op-selector [operations]
@@ -44,6 +44,23 @@
           success-schema (get-in spec [:response-schemas :200])]
       (is (not-empty (:items results)))
       (is (m/validate success-schema results)))))
+
+(deftest valid-crd-schemas
+  (testing "json schemas for json schema translated okay to malli"
+    (doseq [op (kube/ops (force test-client) {:kind "CustomResourceDefinition"})]
+      (let [spec (kube/spec (force test-client) op)]
+        (is (m/schema (:request-schema spec)))
+        (doseq [[_ response-schema] (:response-schemas spec)]
+          (is (m/schema response-schema)))))))
+
+(deftest valid-other-schemas
+  (testing "every generated schema is a valid malli schema"
+    (doseq [op (kube/ops (force test-client))
+            :when (not= "CustomResourceDefinition" (:kind op))]
+      (let [spec (kube/spec (force test-client) op)]
+        (is (m/schema (:request-schema spec)))
+        (doseq [[_ response-schema] (:response-schemas spec)]
+          (is (m/schema response-schema)))))))
 
 (deftest creation-test
   (testing "i can create a namespace"

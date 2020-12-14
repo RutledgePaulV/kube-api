@@ -26,7 +26,7 @@
   :dependencies
   [[org.clojure/clojure "1.10.1"]
    [clj-commons/clj-yaml "0.7.2"]
-   [metosin/malli "753a99933ba4e6d4a257a1b0f9715e68b90fa7f8"]
+   [metosin/malli "c80215c6bb1c8907345702f9c82eb597e1b753e3"]
    [org.clojure/tools.logging "1.1.0"]
    [org.clojars.rutledgepaulv/clj-okhttp "0.1.0-SNAPSHOT"]]
 
