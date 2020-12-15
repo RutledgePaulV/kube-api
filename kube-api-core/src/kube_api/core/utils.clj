@@ -79,8 +79,12 @@
   ([pred coll not-found]
    (reduce (fn [nf x] (if (pred x) (reduced x) nf)) not-found coll)))
 
+(def default-collection-transformer
+  (mt/default-value-transformer {:defaults {:map (constantly {})}}))
+
 (defn validation-error [message schema data]
   (let [error     (-> schema
+                      (m/decode data default-collection-transformer)
                       (mu/closed-schema)
                       (m/explain data)
                       (me/with-spell-checking)
@@ -90,8 +94,7 @@
 
 
 (def default-transformer
-  (mt/default-value-transformer
-    {:defaults {:map (constantly {})}}))
+  (mt/default-value-transformer))
 
 (defn prepare [schema data]
   (m/decode schema data default-transformer))
