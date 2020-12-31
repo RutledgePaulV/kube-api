@@ -28,12 +28,9 @@
         :otherwise form))
     x))
 
-(defn read-kubeconfig [file]
-  (yaml/parse-string (slurp file)))
-
 (defn get-merged-kubeconfig []
   (->> (kubeconfig-files)
-       (map read-kubeconfig)
+       (map (comp yaml/parse-string slurp))
        (apply utils/merge+)
        (normalize)))
 
@@ -74,12 +71,14 @@
    (or (service-account) (current-context (get-merged-kubeconfig))))
   ([kubeconfig]
    (cond
-     ; grab the one marked current
+     ; if there's one marked as current
      (not (strings/blank? (:current-context kubeconfig)))
      (select-context kubeconfig (:current-context kubeconfig))
-     ; otherwise if there's just one, use that
+     ; otherwise if there's only one, use that
      (= 1 (count (:contexts kubeconfig)))
      (select-context kubeconfig (get-in kubeconfig [:contexts 0 :name]))
      ; otherwise it's ambiguous
+     (= 0 (count (:contexts kubeconfig)))
+     (throw (ex-info "No kubernetes contexts to select from." {}))
      :otherwise
-     (throw (ex-info "No default kubernetes context could be identified." {})))))
+     (throw (ex-info "No kubernetes context was selected." {})))))
