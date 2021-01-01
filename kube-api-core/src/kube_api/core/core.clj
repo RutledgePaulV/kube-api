@@ -7,7 +7,8 @@
             [kube-api.core.http :as kube-http]
             [kube-api.core.schemas :as schemas]
             [malli.generator :as gen]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [kube-api.core.swagger.malli :as malli])
   (:import [okhttp3 Response WebSocket]
            [okio ByteString]))
 
@@ -81,6 +82,19 @@
   [client]
   (-> client (meta) :swagger (force)))
 
+(defn malli-registry
+  "Returns a malli registry containing all the definitions from the swagger specification."
+  [client]
+  (let [{:keys [definitions] :as spec} (swagger-specification client)]
+    (into {} (for [definition-name (keys definitions)]
+               (let [schema {:$ref (utils/keyword->pointer definition-name)}]
+                 [(name definition-name) (malli/swagger->malli spec schema)])))))
+
+(defn malli-schema
+  "Returns a malli schema given the name of a definition from the swagger specification."
+  [client definition]
+  (let [spec (swagger-specification client)]
+    (malli/swagger->malli spec {:$ref (utils/keyword->pointer definition)})))
 
 (defn ops
   "Returns fully qualified op selectors for all available operations.

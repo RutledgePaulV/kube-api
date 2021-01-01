@@ -69,6 +69,8 @@
        (map keyword)
        (into [])))
 
+(defn keyword->pointer [keyword]
+  (str "#/definitions/" (name keyword)))
 
 (defn promise? [x]
   (instance? IPending x))
@@ -94,10 +96,11 @@
 
 
 (def default-transformer
-  (mt/default-value-transformer))
+  (mt/transformer
+    (mt/default-value-transformer)))
 
 (defn prepare [schema data]
-  (m/decode schema data default-transformer))
+  (m/encode schema data default-transformer))
 
 (defn validate! [message schema data]
   (let [validator (validator-factory schema)]

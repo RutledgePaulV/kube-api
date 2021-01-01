@@ -2,10 +2,39 @@
   (:require [kube-api.core.core :as kube]
             [clojure.string :as strings]
             [malli.json-schema :as mjs]
-            [kube-api.core.utils :as utils]))
+            [kube-api.core.utils :as utils]
+            [clojure.walk :as walk]
+            [malli.core :as m]))
+
+(def ^:dynamic *patched* false)
+
+(remove-method mjs/accept :ref)
+(remove-method mjs/accept :or)
+
+(defmethod mjs/accept :ref [name _schema _children _options]
+  (if *patched*
+    (let [dereffed (m/deref _schema)]
+      (if (identical? dereffed _schema)
+        (mjs/-ref (m/-ref _schema))
+        (mjs/-transform dereffed _options)))
+    (mjs/-ref (m/-ref _schema))))
+
+(defmethod mjs/accept :or [name _schema _children _options]
+  (if (and *patched*
+           (let [props (m/properties _schema)]
+             (true? (:x-kubernetes-int-or-string props))))
+    {:x-kubernetes-int-or-string true}
+    {:anyOf _children}))
 
 (defn malli->openapi3 [malli]
-  (mjs/transform malli))
+  (let [transformed (binding [*patched* true]
+                      (mjs/transform malli))]
+    (walk/postwalk
+      (fn [form]
+        (if (and (map? form) (= {} (get form :additionalProperties)))
+          (assoc form :additionalProperties true)
+          form))
+      transformed)))
 
 
 (defn create-crd-definition [group name schema {:keys [plural version scope short-names] :as options}]
@@ -102,11 +131,12 @@
                    request     {:body        update-payload
                                 :path-params {:name (get-in update-payload [:metadata :name])}}]
                (kube/invoke client op-selector request)))]
-     (let [create-payload (create-crd-definition group name schema options)
+     (let [final-schema   [:schema {:registry (kube/malli-registry client)} schema]
+           create-payload (create-crd-definition group name final-schema options)
            existing       (get-resource (get-in create-payload [:metadata :name]))
            response       (if (exists? existing)
-                            (update-resource (update-crd-definition existing group name schema options))
+                            (update-resource (update-crd-definition existing group name final-schema options))
                             (create-resource create-payload))]
        (if (conflicts? response)
-         (recur client group name schema options)
+         (recur client group name final-schema options)
          response)))))

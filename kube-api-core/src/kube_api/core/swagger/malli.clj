@@ -8,32 +8,36 @@
 (def DateTimePattern #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 
 (defn dispatch [node context registry]
-  (cond
+  (try
+    (cond
 
-    ; this is a hack extension point in the
-    ; AST so we can define custom malli
-    ; schemas for a handful of swagger defs
-    ; that are insufficiently specified (mainly
-    ; around places where the k8s spec uses
-    ; json-schema to define json-schema.. yay
-    ; for meta schemas)
-    (keyword? node)
-    node
+      ; this is a hack extension point in the
+      ; AST so we can define custom malli
+      ; schemas for a handful of swagger defs
+      ; that are insufficiently specified (mainly
+      ; around places where the k8s spec uses
+      ; json-schema to define json-schema.. yay
+      ; for meta schemas)
+      (keyword? node)
+      node
 
-    (contains? node :$ref)
-    "$ref"
+      (contains? node :$ref)
+      "$ref"
 
-    (contains? node :type)
-    (get node :type)
+      (contains? node :type)
+      (get node :type)
 
-    (true? (get node :x-kubernetes-int-or-string))
-    "x-kubernetes-int-or-string"
+      (true? (get node :x-kubernetes-int-or-string))
+      "x-kubernetes-int-or-string"
 
-    ; some swagger defs are missing type decls
-    ; so we have to discover them using the
-    ; shape i guess... RAWR
-    (and (map? node) (contains? node :properties))
-    "object"))
+      ; some swagger defs are missing type decls
+      ; so we have to discover them using the
+      ; shape i guess... RAWR
+      (and (map? node) (contains? node :properties))
+      "object")
+
+    (catch Exception e
+      (throw (ex-info "Error computing dispatch value." {:node node})))))
 
 (defmulti
   swagger->malli*
@@ -91,17 +95,17 @@
         (and (empty? props) closed)
         [registry
          (if description
-           [:map-of {:description description}
-            [:or :string :keyword]
-            'any?]
+           [:map-of {:description description} :string 'any?]
            [:map-of :string 'any?])]
         (and (empty? props) (not closed))
         (let [[child-registry child]
-              (*recurse* (:additionalProperties node) context registry)]
+              (if (true? (:additionalProperties node))
+                [registry [:map-of :string 'any?]]
+                (*recurse* (:additionalProperties node) context registry))]
           [child-registry
            (if description
-             [:map-of {:description description} [:or :string :keyword] child]
-             [:map-of [:or :string :keyword] child])])
+             [:map-of {:description description} :string child]
+             [:map-of :string child])])
         (not-empty props)
         (let [children (map (fn [[k v]]
                               (let [[child-registry child] (*recurse* v context registry)
@@ -121,11 +125,11 @@
    (case (:format node)
      "byte" [:re Base64Pattern]
      "date-time" [:re DateTimePattern]
-     "int-or-string" [:or :int [:re #"\d+"]]
+     "int-or-string" [:or {:x-kubernetes-int-or-string true} :int [:re #"\d+"]]
      :string)])
 
 (defmethod swagger->malli* "x-kubernetes-int-or-string" [node context registry]
-  [registry [:or :int :string]])
+  [registry [:or {:x-kubernetes-int-or-string true} :int :string]])
 
 (defmethod swagger->malli* "integer" [node context registry]
   [registry :int])
