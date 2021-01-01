@@ -82,19 +82,16 @@
   [client]
   (-> client (meta) :swagger (force)))
 
-(defn malli-registry
+(defn malli-schemas
   "Returns a malli registry containing all the definitions from the swagger specification."
-  [client]
-  (let [{:keys [definitions] :as spec} (swagger-specification client)]
-    (into {} (for [definition-name (keys definitions)]
-               (let [schema {:$ref (utils/keyword->pointer definition-name)}]
-                 [(name definition-name) (malli/swagger->malli spec schema)])))))
-
-(defn malli-schema
-  "Returns a malli schema given the name of a definition from the swagger specification."
-  [client definition]
-  (let [spec (swagger-specification client)]
-    (malli/swagger->malli spec {:$ref (utils/keyword->pointer definition)})))
+  ([client]
+   (malli-schemas client (keys (:definitions (swagger-specification client)))))
+  ([client keys]
+   (let [spec (swagger-specification client)]
+     (into {}
+           (for [key keys]
+             (let [schema {:$ref (utils/keyword->pointer key)}]
+               [(name key) (malli/swagger->malli spec schema)]))))))
 
 (defn ops
   "Returns fully qualified op selectors for all available operations.

@@ -36,6 +36,24 @@
           form))
       transformed)))
 
+(defn find-refs [schema]
+  (let [findings (atom #{})]
+    (clojure.walk/postwalk
+      (fn [form]
+        (when (and (vector? form) (= :ref (first form)))
+          (if (string? (second form))
+            (swap! findings conj (second form))))
+        form)
+      schema)
+    @findings))
+
+
+(defn with-required-registry [client schema]
+  (loop [old-registry {}
+         new-registry (kube/malli-schemas client (find-refs schema))]
+    (if (= old-registry new-registry)
+      [:schema {:registry new-registry} schema]
+      (recur new-registry (merge new-registry (kube/malli-schemas client (find-refs new-registry)))))))
 
 (defn create-crd-definition [group name schema {:keys [plural version scope short-names] :as options}]
   (letfn [(get-plural []
@@ -131,7 +149,7 @@
                    request     {:body        update-payload
                                 :path-params {:name (get-in update-payload [:metadata :name])}}]
                (kube/invoke client op-selector request)))]
-     (let [final-schema   [:schema {:registry (kube/malli-registry client)} schema]
+     (let [final-schema   (with-required-registry client schema)
            create-payload (create-crd-definition group name final-schema options)
            existing       (get-resource (get-in create-payload [:metadata :name]))
            response       (if (exists? existing)
