@@ -21,7 +21,7 @@
   (into {} (map (juxt f identity)) coll))
 
 (def validator-factory
-  (memoize (fn [schema] (m/validator (mu/closed-schema schema)))))
+  (memoize (fn [schema] (m/validator schema))))
 
 (def generator-factory
   (memoize (fn [schema] (gen/generator (mu/closed-schema schema)))))
