@@ -98,17 +98,17 @@
         (and (empty? props) closed)
         [registry
          (if description
-           [:map-of {:description description} :string 'any?]
-           [:map-of :string 'any?])]
+           [:map-of {:description description} [:or :string :keyword] 'any?]
+           [:map-of [:or :string :keyword] 'any?])]
         (and (empty? props) (not closed))
         (let [[child-registry child]
               (if (true? (:additionalProperties node))
-                [registry [:map-of :string 'any?]]
+                [registry [:map-of [:or :string :keyword] 'any?]]
                 (*recurse* (:additionalProperties node) context registry))]
           [child-registry
            (if description
-             [:map-of {:description description} :string child]
-             [:map-of :string child])])
+             [:map-of {:description description} [:or :string :keyword] child]
+             [:map-of [:or :string :keyword] child])])
         (not-empty props)
         (let [children (map (fn [[k v]]
                               (let [[child-registry child] (*recurse* v context registry)
@@ -157,7 +157,7 @@
   (let [definition
         [:or :boolean :int :double :string
          [:vector [:ref ":io.k8s.apimachinery.pkg.apis.meta.v1.Patch"]]
-         [:map-of :string [:ref ":io.k8s.apimachinery.pkg.apis.meta.v1.Patch"]]]]
+         [:map-of [:or :string :keyword] [:ref ":io.k8s.apimachinery.pkg.apis.meta.v1.Patch"]]]]
     [(merge registry {":io.k8s.apimachinery.pkg.apis.meta.v1.Patch" definition})
      [:ref ":io.k8s.apimachinery.pkg.apis.meta.v1.Patch"]]))
 
@@ -167,7 +167,7 @@
   (let [definition
         [:or :boolean :int :double :string
          [:vector [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"]]
-         [:map-of :string [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"]]]]
+         [:map-of [:or :string :keyword] [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"]]]]
     [(merge registry {"io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON" definition})
      [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"]]))
 
@@ -177,7 +177,7 @@
   (let [definition
         [:or :boolean :int :double :string
          [:vector [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON"]]
-         [:map-of :string [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON"]]]]
+         [:map-of [:or :string :keyword] [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON"]]]]
     [(merge registry {"io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON" definition})
      [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON"]]))
 
