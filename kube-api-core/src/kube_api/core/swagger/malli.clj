@@ -30,6 +30,9 @@
       (true? (get node :x-kubernetes-int-or-string))
       "x-kubernetes-int-or-string"
 
+      (true? (get node :x-kubernetes-preserve-unknown-fields))
+      "x-kubernetes-preserve-unknown-fields"
+
       ; some swagger defs are missing type decls
       ; so we have to discover them using the
       ; shape i guess... RAWR
@@ -130,6 +133,9 @@
 
 (defmethod swagger->malli* "x-kubernetes-int-or-string" [node context registry]
   [registry [:or {:x-kubernetes-int-or-string true} :int :string]])
+
+(defmethod swagger->malli* "x-kubernetes-preserve-unknown-fields" [node context registry]
+  (swagger->malli* :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON context registry))
 
 (defmethod swagger->malli* "integer" [node context registry]
   [registry :int])
