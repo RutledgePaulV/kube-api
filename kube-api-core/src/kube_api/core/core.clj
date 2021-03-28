@@ -66,7 +66,10 @@
          (let [{:keys [http-client] :as full-context}
                (update context :http-client #(or % (kube-http/make-http-client context)))]
            (with-meta full-context
-             (let [swagger    (delay (http/get http-client "/openapi/v2" {:as :json}))
+             (let [swagger    (delay (let [response (http/get http-client "/openapi/v2" {:as :json})]
+                                       (if (http/not-found? (:response (meta response)))
+                                         (http/get http-client "swagger.json" {:as :json})
+                                         response)))
                    operations (delay (operations/kube-swagger->operation-views (deref swagger)))]
                {:swagger swagger :operations operations}))))
 

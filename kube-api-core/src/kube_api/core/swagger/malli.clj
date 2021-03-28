@@ -153,9 +153,16 @@
 ; described to be automatically interpreted. because specs are best when they're
 ; only implemented 90% of the way, right?
 
+(defmethod swagger->malli* :io.k8s.apimachinery.pkg.apis.meta.v1.Patch [node context registry]
+  (let [definition
+        [:or :boolean :int :double :string
+         [:vector [:ref ":io.k8s.apimachinery.pkg.apis.meta.v1.Patch"]]
+         [:map-of :string [:ref ":io.k8s.apimachinery.pkg.apis.meta.v1.Patch"]]]]
+    [(merge registry {":io.k8s.apimachinery.pkg.apis.meta.v1.Patch" definition})
+     [:ref ":io.k8s.apimachinery.pkg.apis.meta.v1.Patch"]]))
+
 (utils/defmethodset swagger->malli*
-  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON
-    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON}
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON}
   [_ context registry]
   (let [definition
         [:or :boolean :int :double :string
@@ -165,30 +172,56 @@
      [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"]]))
 
 (utils/defmethodset swagger->malli*
-  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool
-    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool}
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON}
+  [_ context registry]
+  (let [definition
+        [:or :boolean :int :double :string
+         [:vector [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON"]]
+         [:map-of :string [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON"]]]]
+    [(merge registry {"io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON" definition})
+     [:ref "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON"]]))
+
+(utils/defmethodset swagger->malli*
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool}
   [_ context registry]
   (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
         [child-registry child] (*recurse* json-schema-props context registry)]
     [child-registry [:or {:default true} child :boolean]]))
 
 (utils/defmethodset swagger->malli*
-  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray
-    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrArray}
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool}
+  [_ context registry]
+  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps])
+        [child-registry child] (*recurse* json-schema-props context registry)]
+    [child-registry [:or {:default true} child :boolean]]))
+
+(utils/defmethodset swagger->malli*
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray}
   [_ context registry]
   (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
         [child-registry child] (*recurse* json-schema-props context registry)]
     [child-registry [:or child [:vector child]]]))
 
 (utils/defmethodset swagger->malli*
-  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray
-    :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray}
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrArray}
+  [_ context registry]
+  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps])
+        [child-registry child] (*recurse* json-schema-props context registry)]
+    [child-registry [:or child [:vector child]]]))
+
+(utils/defmethodset swagger->malli*
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray}
   [_ context registry]
   (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps])
         [child-registry child] (*recurse* json-schema-props context registry)]
     [child-registry [:or child [:vector :string]]]))
 
-
+(utils/defmethodset swagger->malli*
+  #{:io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray}
+  [_ context registry]
+  (let [json-schema-props (get-in context [:definitions :io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps])
+        [child-registry child] (*recurse* json-schema-props context registry)]
+    [child-registry [:or child [:vector :string]]]))
 
 (defn swagger->malli
   "How you exchange a swagger specification for a malli schema. Must specify
