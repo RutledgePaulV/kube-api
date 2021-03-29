@@ -28,7 +28,7 @@
    [clj-commons/clj-yaml "0.7.2"]
    [metosin/malli "0.3.1"]
    [org.clojure/tools.logging "1.1.0"]
-   [org.clojars.rutledgepaulv/clj-okhttp "0.1.0-SNAPSHOT"]]
+   [org.clojars.rutledgepaulv/clj-okhttp "0.1.0"]]
 
   :repl-options
   {:init-ns kube-api.core.core}
