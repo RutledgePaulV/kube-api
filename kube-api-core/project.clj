@@ -1,4 +1,4 @@
-(defproject kube-api/kube-api-core "0.1.0-SNAPSHOT"
+(defproject kube-api/kube-api-core "0.1.0"
 
   :description
   "A Kubernetes API client for Clojure."
