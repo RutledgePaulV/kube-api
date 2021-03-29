@@ -10,7 +10,7 @@
   {:name "MIT License" :url "http://opensource.org/licenses/MIT" :year 2020 :key "mit"}
 
   :scm
-  {:name "git" :url "https://github.com/rutledgepaulv/kube-api"}
+  {:dir ".."}
 
   :pom-addition
   [:developers
