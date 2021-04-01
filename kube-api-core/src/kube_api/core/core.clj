@@ -193,10 +193,10 @@
    (invoke client op-selector {}))
   ([{:keys [http-client] :as client} op-selector request]
    (let [final-request (prepare-invoke-request client op-selector request)]
-     (http/request* http-client final-request)))
+     (http/request http-client final-request)))
   ([{:keys [http-client] :as client} op-selector request respond raise]
    (let [final-request (prepare-invoke-request client op-selector request)]
-     (http/request* http-client final-request respond raise))))
+     (http/request http-client final-request respond raise))))
 
 
 (defn invoke-stream
@@ -207,13 +207,13 @@
          (kube-http/without-read-timeout http-client)
          final-request
          (assoc (prepare-invoke-request client op-selector request) :as :stream)]
-     (http/request* final-http-client final-request)))
+     (http/request final-http-client final-request)))
   ([{:keys [http-client] :as client} op-selector request respond raise]
    (let [final-client
          (kube-http/without-read-timeout http-client)
          final-request
          (assoc (prepare-invoke-request client op-selector request) :as :stream)]
-     (http/request* final-client final-request respond raise))))
+     (http/request final-client final-request respond raise))))
 
 
 (defn connect
