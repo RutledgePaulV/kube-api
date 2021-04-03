@@ -30,7 +30,7 @@
   []
 
   :dependencies
-  [[kube-api/kube-api-core "0.1.1"]
+  [[kube-api/kube-api-core "0.1.2-SNAPSHOT"]
    [kube-api/kube-api-term "0.1.0-SNAPSHOT"]
    [kube-api/kube-api-io "0.1.0-SNAPSHOT"]
    [kube-api/kube-api-controllers "0.1.0-SNAPSHOT"]

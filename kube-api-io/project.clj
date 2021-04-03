@@ -25,7 +25,7 @@
 
   :dependencies
   [[org.clojure/clojure "1.10.3"]
-   [kube-api/kube-api-core "0.1.1"]]
+   [kube-api/kube-api-core "0.1.2-SNAPSHOT"]]
 
   :profiles
   {:dev {:dependencies [[kube-api/kube-api-test "0.1.0-SNAPSHOT"]
