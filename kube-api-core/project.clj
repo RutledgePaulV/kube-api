@@ -24,7 +24,7 @@
   [["releases" :clojars] ["snapshots" :clojars]]
 
   :dependencies
-  [[org.clojure/clojure "1.10.1"]
+  [[org.clojure/clojure "1.10.3"]
    [clj-commons/clj-yaml "0.7.2"]
    [metosin/malli "0.3.1"]
    [org.clojure/tools.logging "1.1.0"]

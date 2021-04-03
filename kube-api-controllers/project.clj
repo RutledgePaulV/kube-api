@@ -24,8 +24,8 @@
   [["releases" :clojars] ["snapshots" :clojars]]
 
   :dependencies
-  [[org.clojure/clojure "1.10.1"]
-   [kube-api/kube-api-core "0.1.0-SNAPSHOT"]
+  [[org.clojure/clojure "1.10.3"]
+   [kube-api/kube-api-core "0.1.1"]
    [org.clojure/core.async "1.3.610"]]
 
   :profiles
