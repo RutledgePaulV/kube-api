@@ -26,7 +26,7 @@
 
   :dependencies
   [[org.clojure/clojure "1.10.3"]
-   [clj-commons/clj-yaml "0.7.2"]
+   [clj-commons/clj-yaml "0.7.106"]
    [org.testcontainers/testcontainers "1.15.2"]]
 
   :repl-options

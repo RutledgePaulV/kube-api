@@ -12,9 +12,9 @@ Some Clojure Kubernetes libraries already exist, but they're not comprehensive. 
 can write production cluster integrations (controllers, operators, etc) in Clojure. I really enjoy the data orientation
 that you find in other Clojure libraries like cognitect's aws-api and have tried to provide the same here.
 
-The [fabric8.io kubernetes client](https://github.com/fabric8io/kubernetes-client) for java is robust and comprehensive
-but it's rather painful to use from Clojure due to its focus on OOP ergonomics. That said, the fabric8 implementation
-has been my primary reference when implementing the trickier pieces of IO.
+The [fabric8.io kubernetes client](https://github.com/fabric8io/kubernetes-client) for java is robust, but it's
+painful to use from Clojure due to its focus on OOP ergonomics. That said, the fabric8 implementation has been 
+my primary reference when implementing the trickier pieces of IO.
 
 ## Modules
 
@@ -77,28 +77,6 @@ Inspired by:
 Leverages:
 
 - [core.async](https://github.com/clojure/core.async)
-
----
-
-[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-term?style=for-the-badge)](https://www.clojars.org/kube-api/kube-api-term)
-
-[View code examples](./kube-api-term)
-
-This module adapts the byte streams and command channel of an `exec` call into the requirements of a terminal emulator
-so you can display an interactive shell into the selected Kubernetes pod.
-
-Leverages:
-
-- [jediterm](https://github.com/JetBrains/jediterm)
-
----
-
-[![Clojars Project](https://img.shields.io/clojars/v/kube-api/kube-api-ring?style=for-the-badge)](https://www.clojars.org/kube-api/kube-api-ring)
-
-[View code examples](./kube-api-ring)
-
-This module implements ring middleware for pod source ip based authentication. You can use this for service<>service
-authentication within a Kubernetes cluster (so long as the traffic originates from elsewhere in the cluster).
 
 ---
 
