@@ -41,9 +41,7 @@
   ["kube-api-test"
    "kube-api-core"
    "kube-api-controllers"
-   "kube-api-io"
-   "kube-api-ring"
-   "kube-api-term"]
+   "kube-api-io"]
 
   :aliases
   {"test"       ["sub" "test"]
