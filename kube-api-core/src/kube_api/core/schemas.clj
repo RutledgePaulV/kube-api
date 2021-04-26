@@ -27,6 +27,36 @@
         [:name :string]
         [:value :string]]]]]]])
 
+(def gcp-provider-auth
+  [:map {:dispatch-key :gcp-provider}
+   [:name :string]
+   [:auth-provider
+    [:map
+     [:config
+      [:map
+       [:access-token {:optional true} :string]
+       [:cmd-args :string]
+       [:cmd-path :string]
+       [:expiry {:optional true} :number]
+       [:expiry-key :string]
+       [:token-key :string]]]
+     [:name [:= "gcp"]]]]])
+
+(def oidc-provider-auth
+  [:map {:dispatch-key :oidc-provider}
+   [:name :string]
+   [:auth-provider
+    [:map
+     [:config
+      [:map
+       [:client-id :string]
+       [:client-secret :string]
+       [:id-token {:optional true} :string]
+       [:idp-certificate-authority {:optional true} :string]
+       [:idp-issuer-url :string]
+       [:refresh-token {:optional true} :string]]]
+     [:name [:= "oidc"]]]]])
+
 (def token-auth
   [:map {:dispatch-key :token-auth}
    [:token :string]])
@@ -42,7 +72,9 @@
    exec-auth
    token-file-auth
    token-auth
-   basic-auth])
+   basic-auth
+   gcp-provider-auth
+   oidc-provider-auth])
 
 (def cluster-schema
   [:map
