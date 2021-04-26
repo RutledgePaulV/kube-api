@@ -149,6 +149,19 @@
       (update client-opts :middleware (fnil conj []) (retry-middleware gen-new-request)))))
 
 
+(defmethod inject-client-auth :gcp-provider [client-opts user]
+  (let [{:keys [access-token cmd-args cmd-path expiry expiry-key]} (get-in user [:auth-provider :config])]
+    (letfn [(gen-new-request [request force-new]
+              )]
+      (update client-opts :middleware (fnil conj []) (retry-middleware gen-new-request)))))
+
+
+(defmethod inject-client-auth :oidc-provider [client-opts user]
+  (let [{:keys [client-id client-secret id-token idp-certificate-authority idp-issuer-url refresh-token]} (get-in user [:auth-provider :config])]
+    (letfn [(gen-new-request [request force-new]
+              )]
+      (update client-opts :middleware (fnil conj []) (retry-middleware gen-new-request)))))
+
 (comment
 
   (((first (:middleware

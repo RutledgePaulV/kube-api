@@ -29,7 +29,6 @@
 
 (def gcp-provider-auth
   [:map {:dispatch-key :gcp-provider}
-   [:name :string]
    [:auth-provider
     [:map
      [:config
@@ -44,7 +43,6 @@
 
 (def oidc-provider-auth
   [:map {:dispatch-key :oidc-provider}
-   [:name :string]
    [:auth-provider
     [:map
      [:config
