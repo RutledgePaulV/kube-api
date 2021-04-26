@@ -36,7 +36,7 @@
        [:access-token {:optional true} :string]
        [:cmd-args :string]
        [:cmd-path :string]
-       [:expiry {:optional true} :number]
+       [:expiry {:optional true} :int]
        [:expiry-key :string]
        [:token-key :string]]]
      [:name [:= "gcp"]]]]])
