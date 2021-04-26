@@ -150,20 +150,33 @@
 
 ; https://github.com/kubernetes/client-go/blob/v0.21.0/plugin/pkg/client/auth/gcp/gcp.go
 (defmethod inject-client-auth :gcp-provider [client-opts user]
-  (let [{:keys [access-token cmd-args cmd-path expiry token-key expiry-key time-fmt]} (get-in user [:auth-provider :config])
-        state (atom {:access-token access-token :expiry expiry})]
+  (let [{:keys [access-token scopes cmd-args cmd-path expiry token-key expiry-key time-fmt]
+         :or   {scopes     "https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email"
+                token-key  "{.access_token}"
+                expiry-key "{.token_expiry}"
+                time-fmt   "2006-01-02T15:04:05.999999999Z07:00"}}
+        (get-in user [:auth-provider :config])
+        state (atom (doto (delay {:access-token access-token :expiry expiry})
+                      (force)))]
     (letfn [; this is a hack and not full json path support, but how many different formats can the gcp-provider possibly use
             (compile-key-path [key-path]
               (let [path
-                    (-> key-path
-                        (strings/replace #"[{}]" "")
-                        (strings/split #"\.")
-                        (remove strings/blank?))]
+                    (->> (-> key-path
+                             (strings/replace #"[{}]" "")
+                             (strings/split #"\."))
+                         (remove strings/blank?)
+                         (map keyword))]
                 (fn [x] (get-in x path))))
-            (expired? [{:keys [expiry]}]
-              (or (nil? expiry) (neg? (compare (Instant/parse expiry) (Instant/now)))))
+            (parse-timestamp [timestamp]
+              ; TODO: make this work for RFC3339Nano if not any time-fmt
+              (Instant/parse timestamp))
+            (expired? [{:keys [access-token expiry]}]
+              (or
+                (strings/blank? access-token)
+                (strings/blank? expiry)
+                (pos? (compare (parse-timestamp expiry) (Instant/now)))))
             (run []
-              (let [full-command (into [cmd-path] cmd-args)
+              (let [full-command (into [cmd-path] (remove strings/blank? (strings/split cmd-args #"\s+")))
                     directory    (kubeconfig-dir)
                     sh-arguments (cond-> full-command
                                    (some? directory) (conj :dir directory)

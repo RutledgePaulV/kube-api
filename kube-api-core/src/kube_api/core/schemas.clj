@@ -33,13 +33,13 @@
     [:map
      [:config
       [:map
-       [:access-token {:optional true} :string]
-       [:scopes {:optional true} :string]
+       [:access-token {:optional true} [:maybe :string]]
+       [:scopes {:optional true} [:maybe :string]]
        [:cmd-args :string]
        [:cmd-path :string]
-       [:expiry {:optional true} :string]
-       [:expiry-key :string]
-       [:token-key :string]]]
+       [:expiry {:optional true} [:maybe :string]]
+       [:expiry-key {:optional true} [:maybe :string]]
+       [:token-key {:optional true} [:maybe :string]]]]
      [:name [:= "gcp"]]]]])
 
 (def oidc-provider-auth

@@ -29,3 +29,38 @@
 (deftest token-file-configuration
   (let [response (exercise-user-config {:tokenFile (testfile-path "token.txt")})]
     (is (= "Bearer my-bearer-token3" (get-in response [:body :headers "Authorization"])))))
+
+(deftest gcp-configuration
+  (testing "initial auth with no tokens"
+    (let [user-config {:auth-provider
+                       {:name   "gcp"
+                        :config {:cmd-args     (testfile-path "gcloud-response.json")
+                                 :cmd-path     "cat"
+                                 :expiry-key   "{.credential.token_expiry}"
+                                 :token-key    "{.credential.access_token}"}}}
+          response    (exercise-user-config user-config)]
+      (is (= "Bearer billy.bob" (get-in response [:body :headers "Authorization"])))))
+
+  (testing "initial auth with unexpired token"
+    (let [user-config {:auth-provider
+                       {:name   "gcp"
+                        :config {:access-token "hihihi"
+                                 :expiry       "5000-01-02T15:04:05.999999999Z07:00"
+                                 :cmd-args     (testfile-path "gcloud-response.json")
+                                 :cmd-path     "cat"
+                                 :expiry-key   "{.credential.token_expiry}"
+                                 :token-key    "{.credential.access_token}"}}}
+          response    (exercise-user-config user-config)]
+      (is (= "Bearer hihihi" (get-in response [:body :headers "Authorization"])))))
+
+  (testing "initial auth with expired token"
+    (let [user-config {:auth-provider
+                       {:name   "gcp"
+                        :config {:access-token "hihihi"
+                                 :expiry       "1999-01-02T15:04:05.999999999Z07:00"
+                                 :cmd-args     (testfile-path "gcloud-response.json")
+                                 :cmd-path     "cat"
+                                 :expiry-key   "{.credential.token_expiry}"
+                                 :token-key    "{.credential.access_token}"}}}
+          response    (exercise-user-config user-config)]
+      (is (= "Bearer billy.bob" (get-in response [:body :headers "Authorization"]))))))
