@@ -34,9 +34,10 @@
      [:config
       [:map
        [:access-token {:optional true} :string]
+       [:scopes {:optional true} :string]
        [:cmd-args :string]
        [:cmd-path :string]
-       [:expiry {:optional true} :int]
+       [:expiry {:optional true} :string]
        [:expiry-key :string]
        [:token-key :string]]]
      [:name [:= "gcp"]]]]])

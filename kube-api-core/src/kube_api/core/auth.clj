@@ -148,11 +148,52 @@
                 (assoc-in request [:headers "Authorization"] (str "Bearer " new-token))))]
       (update client-opts :middleware (fnil conj []) (retry-middleware gen-new-request)))))
 
-
+; https://github.com/kubernetes/client-go/blob/v0.21.0/plugin/pkg/client/auth/gcp/gcp.go
 (defmethod inject-client-auth :gcp-provider [client-opts user]
-  (let [{:keys [access-token cmd-args cmd-path expiry expiry-key]} (get-in user [:auth-provider :config])]
-    (letfn [(gen-new-request [request force-new]
-              )]
+  (let [{:keys [access-token cmd-args cmd-path expiry token-key expiry-key time-fmt]} (get-in user [:auth-provider :config])
+        state (atom {:access-token access-token :expiry expiry})]
+    (letfn [; this is a hack and not full json path support, but how many different formats can the gcp-provider possibly use
+            (compile-key-path [key-path]
+              (let [path
+                    (-> key-path
+                        (strings/replace #"[{}]" "")
+                        (strings/split #"\.")
+                        (remove strings/blank?))]
+                (fn [x] (get-in x path))))
+            (expired? [{:keys [expiry]}]
+              (or (nil? expiry) (neg? (compare (Instant/parse expiry) (Instant/now)))))
+            (run []
+              (let [full-command (into [cmd-path] cmd-args)
+                    directory    (kubeconfig-dir)
+                    sh-arguments (cond-> full-command
+                                   (some? directory) (conj :dir directory)
+                                   :always
+                                   (conj :out-enc :bytes))
+                    {:keys [out err exit]} (apply sh/sh sh-arguments)]
+                (if (zero? exit)
+                  (let [data (muun/decode "application/json" out)]
+                    {:access-token ((compile-key-path token-key) data)
+                     :expiry       ((compile-key-path expiry-key) data)})
+                  (throw (ex-info
+                           (format "Error code '%d' returned when obtaining token using command '%s'.\n%s\n%s" exit (strings/join " " full-command) err)
+                           {:exit exit :err err})))))
+            (gen-new-request [request force-new]
+              (let [new-delay (delay (run))
+                    swap-fn   (if force-new
+                                (fn [old]
+                                  (if (and (some? old) (not (realized? old)))
+                                    old
+                                    new-delay))
+                                (fn [old]
+                                  (cond
+                                    (nil? old) new-delay
+                                    (not (realized? old)) old
+                                    (try
+                                      (expired? (force old))
+                                      (catch Exception e true)) new-delay
+                                    :otherwise old)))
+                    {:keys [access-token]} (force (swap! state swap-fn))]
+                (assoc-in request [:headers "Authorization"] (str "Bearer " access-token))))]
       (update client-opts :middleware (fnil conj []) (retry-middleware gen-new-request)))))
 
 
