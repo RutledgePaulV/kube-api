@@ -45,7 +45,7 @@
     (let [user-config {:auth-provider
                        {:name   "gcp"
                         :config {:access-token "hihihi"
-                                 :expiry       "5000-01-02T15:04:05.999999999Z07:00"
+                                 :expiry       "5000-01-02T15:04:05.999999Z"
                                  :cmd-args     (testfile-path "gcloud-response.json")
                                  :cmd-path     "cat"
                                  :expiry-key   "{.credential.token_expiry}"
@@ -57,7 +57,7 @@
     (let [user-config {:auth-provider
                        {:name   "gcp"
                         :config {:access-token "hihihi"
-                                 :expiry       "1999-01-02T15:04:05.999999999Z07:00"
+                                 :expiry       "1999-01-02T15:04:05.999999Z"
                                  :cmd-args     (testfile-path "gcloud-response.json")
                                  :cmd-path     "cat"
                                  :expiry-key   "{.credential.token_expiry}"

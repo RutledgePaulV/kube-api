@@ -154,7 +154,7 @@
          :or   {scopes     "https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email"
                 token-key  "{.access_token}"
                 expiry-key "{.token_expiry}"
-                time-fmt   "2006-01-02T15:04:05.999999999Z07:00"}}
+                time-fmt   "2006-01-02T15:04:05.999999Z"}}
         (get-in user [:auth-provider :config])
         state (atom (doto (delay {:access-token access-token :expiry expiry})
                       (force)))]
@@ -168,13 +168,16 @@
                          (map keyword))]
                 (fn [x] (get-in x path))))
             (parse-timestamp [timestamp]
-              ; TODO: make this work for RFC3339Nano if not any time-fmt
+              ; TODO: make this work for RFC3339Nano if not
+              ; for any time-fmt (would need to add support for
+              ; converting go reference timestamps into
+              ; DateTimeFormatter instances
               (Instant/parse timestamp))
             (expired? [{:keys [access-token expiry]}]
               (or
                 (strings/blank? access-token)
                 (strings/blank? expiry)
-                (pos? (compare (parse-timestamp expiry) (Instant/now)))))
+                (neg? (compare (parse-timestamp expiry) (Instant/now)))))
             (run []
               (let [full-command (into [cmd-path] (remove strings/blank? (strings/split cmd-args #"\s+")))
                     directory    (kubeconfig-dir)
