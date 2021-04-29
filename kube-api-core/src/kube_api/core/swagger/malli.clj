@@ -37,7 +37,15 @@
       ; so we have to discover them using the
       ; shape i guess... RAWR
       (and (map? node) (contains? node :properties))
-      "object")
+      "object"
+
+      ; because sometimes the type is missing but we can infer from format
+      (contains? #{"date-time" "byte" "int-or-string"} (:format node))
+      "string"
+
+      ; because sometimes the type is missing but we can infer from format
+      (contains? #{"double"} (:format node))
+      "number")
 
     (catch Exception e
       (throw (ex-info "Error computing dispatch value." {:node node})))))
