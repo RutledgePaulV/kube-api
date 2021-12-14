@@ -21,6 +21,9 @@
       (keyword? node)
       node
 
+      (empty? node)
+      "empty"
+
       (contains? node :$ref)
       "$ref"
 
@@ -70,6 +73,9 @@
 
 (defmethod swagger->malli* :default [node context registry]
   (throw (ex-info "Undefined conversion! Teach me." {:node node})))
+
+(defmethod swagger->malli* "empty" [node context registry]
+  [registry 'any?])
 
 (defmethod swagger->malli* "$ref" [node context registry]
   (let [pointer       (get node :$ref)
