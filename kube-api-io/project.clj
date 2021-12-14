@@ -29,7 +29,7 @@
 
   :profiles
   {:dev {:dependencies [[kube-api/kube-api-test "0.1.0-SNAPSHOT"]
-                        [org.slf4j/slf4j-simple "1.7.30"]]}}
+                        [org.slf4j/slf4j-simple "1.7.32"]]}}
 
   :repl-options
   {:init-ns kube-api.io.core})

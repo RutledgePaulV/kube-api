@@ -26,11 +26,11 @@
   :dependencies
   [[org.clojure/clojure "1.10.3"]
    [kube-api/kube-api-core "0.1.2-SNAPSHOT"]
-   [org.clojure/core.async "1.3.610"]]
+   [org.clojure/core.async "1.5.640"]]
 
   :profiles
   {:dev {:dependencies [[kube-api/kube-api-test "0.1.0-SNAPSHOT"]
-                        [org.slf4j/slf4j-simple "1.7.30"]]}}
+                        [org.slf4j/slf4j-simple "1.7.32"]]}}
 
   :repl-options
   {:init-ns kube-api.controllers.controllers})
