@@ -237,6 +237,9 @@
         [child-registry child] (*recurse* json-schema-props context registry)]
     [child-registry [:or child [:vector :string]]]))
 
+(defmethod kube-api.core.swagger.malli/swagger->malli* nil [node context registry]
+  [registry [:any]])
+
 (defn swagger->malli
   "How you exchange a swagger specification for a malli schema. Must specify
    the 'root' chunk of swagger spec that you want to convert into a schema."
