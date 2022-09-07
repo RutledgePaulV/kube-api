@@ -85,7 +85,9 @@
                                    :always
                                    (conj :out-enc :bytes)
                                    :always
-                                   (conj :env (into {} (map (juxt :name :value)) env)))
+                                   (conj :env (merge
+                                                (into {} (System/getenv))
+                                                (into {} (map (juxt :name :value)) env))))
                     {:keys [out err exit]} (apply sh/sh sh-arguments)]
                 (if (zero? exit)
                   (let [data (muun/decode "application/json" out)
